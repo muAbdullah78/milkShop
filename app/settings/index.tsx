@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import { useAuth } from '@/data/AuthProvider';
 import { useLock } from '@/data/LockProvider';
+import { usePlatform } from '@/data/PlatformProvider';
 import { useShop } from '@/data/ShopProvider';
 import { useI18n } from '@/i18n';
 import { spacing, useColors, useTheme, type ThemePref } from '@/theme';
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
   const { shop } = useShop();
   const { user, signOut } = useAuth();
   const { enabled: pinOn } = useLock();
+  const { isEnabled } = usePlatform();
 
   const [confirmOut, setConfirmOut] = useState(false);
 
@@ -113,20 +115,24 @@ export default function SettingsScreen() {
             iconColor={pinOn ? c.success : c.textMuted}
             onPress={() => router.push('/settings/security')}
           />
-          <ListRow
-            title={t('set.reminders')}
-            subtitle={t('set.reminderDailySub')}
-            icon="bell-outline"
-            iconColor={c.warning}
-            onPress={() => router.push('/settings/reminders')}
-          />
-          <ListRow
-            title={t('set.backup')}
-            subtitle={t('set.backupSub')}
-            icon="cloud-download-outline"
-            iconColor={c.info}
-            onPress={() => router.push('/settings/backup')}
-          />
+          {isEnabled('reminders') ? (
+            <ListRow
+              title={t('set.reminders')}
+              subtitle={t('set.reminderDailySub')}
+              icon="bell-outline"
+              iconColor={c.warning}
+              onPress={() => router.push('/settings/reminders')}
+            />
+          ) : null}
+          {isEnabled('backup') ? (
+            <ListRow
+              title={t('set.backup')}
+              subtitle={t('set.backupSub')}
+              icon="cloud-download-outline"
+              iconColor={c.info}
+              onPress={() => router.push('/settings/backup')}
+            />
+          ) : null}
         </ListCard>
 
         {/* Data */}
@@ -152,9 +158,36 @@ export default function SettingsScreen() {
           />
         </ListCard>
 
+        {/* Legal — Play Store requires the privacy policy to be reachable
+            from inside the app, not only from the store listing. */}
+        <SectionHeader title={t('legal.title')} icon="shield-lock-outline" style={{ marginTop: spacing.xxl }} />
+        <ListCard>
+          <ListRow
+            title={t('legal.privacy')}
+            subtitle={t('legal.privacySub')}
+            icon="shield-lock-outline"
+            iconColor={c.primary}
+            onPress={() => router.push('/settings/legal')}
+          />
+          <ListRow
+            title={t('help.row')}
+            subtitle={t('help.rowSub')}
+            icon="lifebuoy"
+            iconColor={c.info}
+            onPress={() => router.push('/settings/help')}
+          />
+        </ListCard>
+
         {/* Account */}
         <SectionHeader title={t('set.account')} icon="account-circle-outline" style={{ marginTop: spacing.xxl }} />
         <ListCard>
+          <ListRow
+            title={t('acct.title')}
+            subtitle={t('acct.deleteSub')}
+            icon="account-cog-outline"
+            iconColor={c.textMuted}
+            onPress={() => router.push('/settings/account')}
+          />
           <ListRow
             title={t('auth.signOut')}
             subtitle={user?.email ?? undefined}

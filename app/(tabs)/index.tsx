@@ -41,6 +41,7 @@ import {
   statsForMonth,
   topCustomersByMilk,
 } from '@/features/stats';
+import { usePlatform } from '@/data/PlatformProvider';
 import { useMonthlyCatchUp } from '@/features/useMonthlyCatchUp';
 import { useI18n } from '@/i18n';
 import { greetingKey, isScheduledOn, thisMonthKey, todayKey } from '@/lib/dates';
@@ -71,6 +72,7 @@ export default function Dashboard() {
   const { data: khaataEntries } = useKhaataEntriesForMonth(month);
   const { data: invoices } = useInvoicesForMonth(month);
   const lowStock = useLowStockProducts();
+  const { config: platform } = usePlatform();
 
   const toast = useToast();
   useMonthlyCatchUp(
@@ -171,6 +173,55 @@ export default function Dashboard() {
 
       {/* ── Milk round card ──────────────────────────────────────────────── */}
       <View style={styles.body}>
+        {/* Announcement pushed from the admin console */}
+        {platform?.announcement?.active && platform.announcement.title ? (
+          <View
+            style={[
+              styles.announce,
+              {
+                backgroundColor:
+                  platform.announcement.tone === 'warning'
+                    ? c.warningSoft
+                    : platform.announcement.tone === 'success'
+                      ? c.successSoft
+                      : c.infoSoft,
+              },
+            ]}
+          >
+            <MaterialCommunityIcons
+              name={
+                platform.announcement.tone === 'warning'
+                  ? 'alert-outline'
+                  : platform.announcement.tone === 'success'
+                    ? 'party-popper'
+                    : 'bullhorn-outline'
+              }
+              size={20}
+              color={
+                platform.announcement.tone === 'warning'
+                  ? c.warning
+                  : platform.announcement.tone === 'success'
+                    ? c.success
+                    : c.info
+              }
+            />
+            <View style={{ flex: 1 }}>
+              <Txt variant="body" weight="700">
+                {lang === 'ur' && platform.announcement.titleUr
+                  ? platform.announcement.titleUr
+                  : platform.announcement.title}
+              </Txt>
+              {platform.announcement.body || platform.announcement.bodyUr ? (
+                <Txt variant="caption" muted style={{ marginTop: 1 }}>
+                  {lang === 'ur' && platform.announcement.bodyUr
+                    ? platform.announcement.bodyUr
+                    : platform.announcement.body}
+                </Txt>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
         <Pressable onPress={() => router.push('/delivery')}>
           <Card style={[styles.roundCard, { borderColor: roundDone ? c.success : c.primary }]} level={2}>
             <View style={styles.roundTop}>
@@ -449,6 +500,14 @@ const styles = StyleSheet.create({
   heroStats: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl },
   heroDivider: { width: StyleSheet.hairlineWidth * 2, height: 30 },
   body: { paddingHorizontal: spacing.lg, marginTop: -spacing.md },
+  announce: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginTop: spacing.xl,
+  },
   roundCard: { borderWidth: 1.5, marginTop: spacing.xl },
   roundTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   roundIcon: { width: 50, height: 50, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

@@ -6,6 +6,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Badge, Card, ListCard, ListRow, SectionHeader, Txt } from '@/components/ui';
 import { useCustomers, useExpensesForMonth, useSuppliers } from '@/data/hooks';
 import { useAuth } from '@/data/AuthProvider';
+import { usePlatform } from '@/data/PlatformProvider';
 import { useShop } from '@/data/ShopProvider';
 import { useI18n } from '@/i18n';
 import { thisMonthKey } from '@/lib/dates';
@@ -17,6 +18,7 @@ export default function MoreScreen() {
   const { t, money, num } = useI18n();
   const { shop } = useShop();
   const { user } = useAuth();
+  const { isEnabled } = usePlatform();
 
   const { data: customers } = useCustomers();
   const { data: suppliers } = useSuppliers();
@@ -144,13 +146,15 @@ export default function MoreScreen() {
           iconColor={c.danger}
           onPress={() => router.push('/settings/security')}
         />
-        <ListRow
-          title={t('set.backup')}
-          subtitle={t('set.backupSub')}
-          icon="cloud-download-outline"
-          iconColor={c.info}
-          onPress={() => router.push('/settings/backup')}
-        />
+        {isEnabled('backup') ? (
+          <ListRow
+            title={t('set.backup')}
+            subtitle={t('set.backupSub')}
+            icon="cloud-download-outline"
+            iconColor={c.info}
+            onPress={() => router.push('/settings/backup')}
+          />
+        ) : null}
         <ListRow
           title={t('set.title')}
           subtitle={t('set.appearance')}

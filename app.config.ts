@@ -64,6 +64,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   platforms: ['android'],
   android: {
     package: 'com.milkbook.app',
+    // Bump this by 1 for every upload to Play. eas.json uses
+    // `appVersionSource: "local"` on purpose, so the number the app reports at
+    // runtime is exactly the number in this file — the admin console's
+    // "minimum version" gate compares against it and would be meaningless if
+    // a build server were picking the value.
     versionCode: 1,
     ...(hasGoogleServices ? { googleServicesFile: GOOGLE_SERVICES } : {}),
     adaptiveIcon: {

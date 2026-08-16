@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Update the domain here if you deploy somewhere other than milkbook.app.
+  /admin is deliberately absent — it is disallowed in robots.txt.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://milkbook.app/</loc><priority>1.0</priority></url>
+  <url><loc>https://milkbook.app/features</loc><priority>0.8</priority></url>
+  <url><loc>https://milkbook.app/how-it-works</loc><priority>0.8</priority></url>
+  <url><loc>https://milkbook.app/pricing</loc><priority>0.7</priority></url>
+  <url><loc>https://milkbook.app/download</loc><priority>0.8</priority></url>
+  <url><loc>https://milkbook.app/faq</loc><priority>0.6</priority></url>
+  <url><loc>https://milkbook.app/support</loc><priority>0.6</priority></url>
+  <url><loc>https://milkbook.app/about</loc><priority>0.4</priority></url>
+  <url><loc>https://milkbook.app/privacy</loc><priority>0.5</priority></url>
+  <url><loc>https://milkbook.app/terms</loc><priority>0.4</priority></url>
+  <url><loc>https://milkbook.app/delete-account</loc><priority>0.5</priority></url>
+</urlset>
