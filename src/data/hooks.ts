@@ -6,6 +6,7 @@ import type {
   Category,
   Customer,
   Delivery,
+  KhaataEntry,
   Expense,
   ExpenseCategory,
   Invoice,
@@ -177,12 +178,42 @@ export function useCustomerSales(customerId: string | undefined) {
   );
 }
 
+export function useKhaataEntries(customerId: string | undefined) {
+  const shopId = useShopId();
+  return useLiveQuery<KhaataEntry>(
+    () =>
+      shopId && customerId
+        ? query(shopCol(shopId, COL.khaataEntries), where('customerId', '==', customerId))
+        : null,
+    [shopId, customerId]
+  );
+}
+
+export function useKhaataEntriesForMonth(month: string = thisMonthKey()) {
+  const shopId = useShopId();
+  return useLiveQuery<KhaataEntry>(
+    () => (shopId ? query(shopCol(shopId, COL.khaataEntries), where('month', '==', month)) : null),
+    [shopId, month]
+  );
+}
+
 export function useCustomerPayments(customerId: string | undefined) {
   const shopId = useShopId();
   return useLiveQuery<Payment>(
     () =>
       shopId && customerId
         ? query(shopCol(shopId, COL.payments), where('customerId', '==', customerId))
+        : null,
+    [shopId, customerId]
+  );
+}
+
+export function useInvoicesForCustomer(customerId: string | undefined) {
+  const shopId = useShopId();
+  return useLiveQuery<Invoice>(
+    () =>
+      shopId && customerId
+        ? query(shopCol(shopId, COL.invoices), where('customerId', '==', customerId))
         : null,
     [shopId, customerId]
   );

@@ -18,6 +18,7 @@ import { dayKey, monthKeyOf } from '@/lib/dates';
 import type {
   Category,
   Customer,
+  KhaataEntry,
   Delivery,
   DeliveryStatus,
   Expense,
@@ -261,6 +262,90 @@ export const customerRepo = {
       balance: increment(delta),
       updatedAt: now(),
     } as never);
+  },
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Khaata (the credit ledger)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Opening a khaata is an explicit decision — it is the shopkeeper saying "I
+ * trust this person to pay later". Nothing goes on credit before it, and the
+ * date it was opened is kept because customers ask.
+ */
+export const khaataRepo = {
+  async open(shopId: string, customerId: string) {
+    await updateDoc(shopSubDoc(shopId, COL.customers, customerId), {
+      khaataOpen: true,
+      khaataOpenedAt: now(),
+      updatedAt: now(),
+    } as never);
+  },
+
+  async close(shopId: string, customerId: string) {
+    await updateDoc(shopSubDoc(shopId, COL.customers, customerId), {
+      khaataOpen: false,
+      khaataClosedAt: now(),
+      updatedAt: now(),
+    } as never);
+  },
+
+  async setLimit(shopId: string, customerId: string, limit: number) {
+    await updateDoc(shopSubDoc(shopId, COL.customers, customerId), {
+      khaataLimit: limit > 0 ? limit : 0,
+      updatedAt: now(),
+    } as never);
+  },
+
+  /** Writes one line in the ledger and moves the customer's balance with it. */
+  async addEntry(
+    shopId: string,
+    input: {
+      customer: Customer;
+      date: string;
+      ts: number;
+      kind: 'debit' | 'credit';
+      title: string;
+      amount: number;
+      items?: KhaataEntry['items'];
+      note?: string;
+    }
+  ): Promise<string> {
+    const id = newId(shopId, COL.khaataEntries);
+    const amount = round2(Math.abs(input.amount));
+    const row: Omit<KhaataEntry, 'id'> = {
+      date: input.date,
+      month: monthKeyOf(input.date),
+      ts: input.ts,
+      customerId: input.customer.id,
+      customerName: input.customer.name,
+      kind: input.kind,
+      title: input.title.trim(),
+      amount,
+      items: input.items?.length ? input.items : undefined,
+      note: input.note?.trim() || undefined,
+      createdAt: now(),
+    };
+
+    const batch = writeBatch(db());
+    batch.set(shopSubDoc(shopId, COL.khaataEntries, id), clean(row));
+    batch.update(shopSubDoc(shopId, COL.customers, input.customer.id), {
+      balance: increment(input.kind === 'debit' ? amount : -amount),
+      updatedAt: now(),
+    } as never);
+    await batch.commit();
+    return id;
+  },
+
+  async removeEntry(shopId: string, entry: KhaataEntry) {
+    const batch = writeBatch(db());
+    batch.delete(shopSubDoc(shopId, COL.khaataEntries, entry.id));
+    batch.update(shopSubDoc(shopId, COL.customers, entry.customerId), {
+      balance: increment(entry.kind === 'debit' ? -entry.amount : entry.amount),
+      updatedAt: now(),
+    } as never);
+    await batch.commit();
   },
 };
 
@@ -803,6 +888,9 @@ export const invoiceRepo = {
       createdAt: existing.exists() ? (existing.data()?.createdAt as number) : now(),
       updatedAt: now(),
       chargePosted: alreadyPosted || input.postFixedCharge > 0,
+      chargeAmount: alreadyPosted
+        ? ((existing.data()?.chargeAmount as number | undefined) ?? 0)
+        : input.postFixedCharge,
     };
 
     const batch = writeBatch(db());

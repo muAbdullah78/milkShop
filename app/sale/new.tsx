@@ -21,6 +21,7 @@ import {
 import { useActiveCustomers, useCategories, useProducts } from '@/data/hooks';
 import { saleRepo } from '@/data/repo';
 import { useShopId } from '@/data/ShopProvider';
+import { isKhaataOpen } from '@/features/khaata';
 import { useI18n } from '@/i18n';
 import { todayKey } from '@/lib/dates';
 import { radius, spacing, useColors } from '@/theme';
@@ -147,6 +148,10 @@ export default function NewSale() {
     if (onCredit && !customer) {
       toast.error(t('sale.pickCustomer'));
       setPickCustomer(true);
+      return;
+    }
+    if (onCredit && customer && !isKhaataOpen(customer)) {
+      toast.error(t('khaata.needsKhaata', { name: customer.name }));
       return;
     }
     setSaving(true);

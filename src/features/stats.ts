@@ -1,11 +1,13 @@
 import { round2 } from '@/data/repo';
-import { lastNDays, monthRange } from '@/lib/dates';
+import { isMonthClosed, lastNDays, monthRange } from '@/lib/dates';
 import type {
   Category,
   Customer,
   Delivery,
   Expense,
   ExpenseCategory,
+  Invoice,
+  KhaataEntry,
   Payment,
   Product,
   Purchase,
@@ -74,19 +76,38 @@ export function statsForMonth(input: {
   expenses: Expense[];
   purchases: Purchase[];
   customers: Customer[];
+  khaataEntries?: KhaataEntry[];
+  invoices?: Invoice[];
 }): MonthStats {
   const delivered = input.deliveries.filter((d) => d.status === 'delivered');
   const milkQty = round2(delivered.reduce((s, d) => s + d.qty, 0));
   const milkAmount = round2(delivered.reduce((s, d) => s + d.amount, 0));
 
-  const monthlyFixed = round2(
+  // For a finished month, the truth is what was actually posted. Only the
+  // month in progress gets estimated from the current customer list.
+  const postedMonthly = round2(
+    (input.invoices ?? [])
+      .filter((i) => i.month === input.month && i.chargePosted)
+      .reduce((s, i) => s + (i.chargeAmount ?? 0), 0)
+  );
+  const estimatedMonthly = round2(
     input.customers
       .filter((c) => c.active && c.billingType === 'monthly')
       .reduce((s, c) => s + (c.monthlyAmount || 0), 0)
   );
+  const monthlyFixed = isMonthClosed(input.month) ? postedMonthly : estimatedMonthly;
 
   const itemSales = round2(input.sales.reduce((s, x) => s + x.total, 0));
   const itemCost = round2(input.sales.reduce((s, x) => s + x.cost, 0));
+
+  // Lines the shopkeeper wrote by hand are earnings too — without this they
+  // would show up as money owed but never as money earned.
+  const khaataWritten = round2(
+    (input.khaataEntries ?? []).reduce(
+      (s, e) => s + (e.kind === 'debit' ? e.amount : -e.amount),
+      0
+    )
+  );
 
   const collected = round2(
     input.sales.filter((x) => !x.onCredit).reduce((s, x) => s + x.total, 0) +
@@ -96,7 +117,7 @@ export function statsForMonth(input: {
   const expenses = round2(input.expenses.reduce((s, e) => s + e.amount, 0));
   const purchases = round2(input.purchases.reduce((s, p) => s + p.amount, 0));
 
-  const earned = round2(milkAmount + monthlyFixed + itemSales);
+  const earned = round2(milkAmount + monthlyFixed + itemSales + khaataWritten);
   const outstanding = round2(input.customers.reduce((s, c) => s + Math.max(0, c.balance), 0));
 
   const uniqueDays = new Set(delivered.map((d) => d.date));

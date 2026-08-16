@@ -23,6 +23,25 @@ chosen weekdays). Each customer is billed either **by the litre** or on a **fixe
 monthly** amount — set per customer. Opening balances carry old udhaar across from
 the paper book.
 
+**The khaata (کھاتہ) — the ledger**
+
+The heart of the app, and how these shops actually run. A customer exists in the
+customer list; the owner then **opens a khaata** for them, which is the moment
+they decide to trust someone, and it is recorded with its date. From then on
+everything that person takes lands in one chronological ledger — milk from the
+morning round, items taken off the counter, lines the owner writes by hand
+("2 dozen eggs, Rs 700") — each stamped with the **date and the time**. They pay
+whenever they like, in full or in part, and the running balance moves with it.
+
+Every line shows what changed and what was owed immediately after, so the ledger
+reads exactly like the paper book. Tap **Send Full Record** and the customer gets
+the whole thing on WhatsApp, line by line, and can check it themselves — that is
+what turns the khaata from the owner's word into shared proof.
+
+An optional **trust limit** per customer warns when someone goes too deep. Credit
+is blocked until a khaata is actually open. A customer with any history can never
+be deleted — only closed — so the record survives a dispute.
+
 **Monthly bills on WhatsApp**
 The feature the shops actually want. For any month, MilkBook builds each customer's
 bill — milk, other items, old balance, payments received — and sends it:
@@ -104,8 +123,9 @@ is the difference between a usable app and a demo.
 ```
 app/                     expo-router screens
   (auth)/                sign in / sign up
-  (tabs)/                home · milk round · customers · shop · more
-  customer/ bill/ sale/ payment/ expenses/ products/ suppliers/ purchases/
+  (tabs)/                home · milk round · khaata · customers · more
+  khaata/ customer/ bill/ sale/ payment/ expenses/ products/ shop/
+  suppliers/ purchases/
   reports/ settings/
 src/
   theme/                 palette, spacing, typography, font selection
@@ -113,24 +133,40 @@ src/
   components/ui/         the component library
   components/charts/     SVG charts
   data/                  Firestore refs, live-query hooks, repositories
-  features/              billing engine, WhatsApp, PDF/image export, stats, backup
+  features/              khaata ledger, billing, WhatsApp, PDF/image export,
+                         monthly charge posting, reconciliation, stats, backup
   lib/                   dates, number formatting, security, notifications
 ```
 
 ### The money model
 
-`customer.balance` is the single source of truth for what someone owes right now.
-It moves on delivery, on credit sale, on payment, and on the fixed monthly charge —
-which is posted exactly once per month, guarded by the invoice document, so a bill
-previewed twice never double-charges. A bill then explains that number rather than
-recomputing it:
+Events are the truth; `customer.balance` is a cache of them. Every write moves the
+balance with an atomic `increment` in the same batch that writes the event, so the
+two can never drift from a half-applied write. Deliveries use deterministic ids
+(`{date}__{customerId}`), so marking the same customer twice offline is a no-op
+rather than a duplicate.
 
-```
-total = previousBalance + monthCharges − paidInMonth
-```
+The khaata ledger merges deliveries, credit sales, hand-written lines, posted
+monthly charges and payments into one list ordered by when things happened, then
+walks the running balance **backwards from the live balance**. That means a
+partial window (the default "recent" view is three months) is still arithmetically
+exact — the oldest visible row is anchored by whatever was owed before it.
 
-Deliveries use deterministic ids (`{date}__{customerId}`), so marking the same
-customer twice offline is a no-op instead of a duplicate.
+Fixed-monthly charges post automatically as soon as a month closes, guarded by a
+`chargePosted` flag on that month's invoice document and written in the same batch
+as the increment, so a charge lands exactly once even if the app is killed
+mid-write or the queue replays offline. The posted amount is frozen on the
+invoice, so changing a customer's monthly rate later cannot rewrite history.
+
+Because a cache can still be corrupted by things outside the app — a console edit,
+two phones marking the same delivery offline — every khaata has a **Check & Fix
+Total** button that re-adds every line from scratch and repairs the counter.
+
+The ledger arithmetic is verified by a simulation that replays hundreds of random
+events through the same write rules the repositories use, then asserts every row
+chains to the next, the last row equals the live balance, an independent recount
+agrees, and a windowed view still adds up. It runs clean across randomized shops:
+`node scripts/ledger-math-test.mjs`.
 
 ---
 

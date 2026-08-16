@@ -19,6 +19,8 @@ import {
   useToast,
 } from '@/components/ui';
 import { useCustomer, useRoutes } from '@/data/hooks';
+import { customerHasHistory } from '@/features/reconcile';
+import { isKhaataOpen } from '@/features/khaata';
 import { customerRepo } from '@/data/repo';
 import { useShop, useShopId } from '@/data/ShopProvider';
 import { useI18n } from '@/i18n';
@@ -50,6 +52,9 @@ export default function CustomerEdit() {
   const [schedule, setSchedule] = useState<DeliverySchedule>('daily');
   const [customDays, setCustomDays] = useState<number[]>([1, 2, 3, 4, 5, 6, 0]);
   const [openingBalance, setOpeningBalance] = useState(0);
+  // Suggested on for new customers: almost every milk customer is on khaata.
+  const [khaataOpen, setKhaataOpen] = useState(true);
+  const [khaataLimit, setKhaataLimit] = useState(0);
   const [notes, setNotes] = useState('');
   const [active, setActive] = useState(true);
 
@@ -72,6 +77,8 @@ export default function CustomerEdit() {
       setSchedule(customer.schedule);
       setCustomDays(customer.customDays?.length ? customer.customDays : [1, 2, 3, 4, 5, 6, 0]);
       setOpeningBalance(customer.openingBalance);
+      setKhaataOpen(isKhaataOpen(customer));
+      setKhaataLimit(customer.khaataLimit ?? 0);
       setNotes(customer.notes ?? '');
       setActive(customer.active);
       setHydrated(true);
@@ -105,6 +112,10 @@ export default function CustomerEdit() {
         schedule,
         customDays: schedule === 'custom' ? customDays : [],
         openingBalance,
+        khaataOpen,
+        khaataOpenedAt:
+          khaataOpen && !customer?.khaataOpenedAt ? Date.now() : customer?.khaataOpenedAt,
+        khaataLimit: khaataLimit > 0 ? khaataLimit : 0,
         notes: notes.trim() || undefined,
         active,
       };
@@ -131,7 +142,17 @@ export default function CustomerEdit() {
       return;
     }
     setSaving(true);
+    // A customer with any khaata history is never deleted — deleting the
+    // customer document would strand their deliveries, sales and payments in
+    // the database, silently poisoning every report and destroying the proof
+    // that settles a dispute. They get closed, not erased.
     try {
+      if (await customerHasHistory(shopId, customer.id)) {
+        setConfirmDelete(false);
+        toast.error(t('cust.deleteBlockedHistory'));
+        setSaving(false);
+        return;
+      }
       await customerRepo.remove(shopId, customer.id);
       toast.success(t('ok.deleted'));
       router.dismissAll();
@@ -324,6 +345,25 @@ export default function CustomerEdit() {
               icon="history"
             />
             <TextField label={t('common.notes')} value={notes} onChangeText={setNotes} multiline icon="note-outline" />
+            <SwitchRow
+              label={t('khaata.open')}
+              sublabel={t('khaata.openInfo')}
+              value={khaataOpen}
+              onValueChange={setKhaataOpen}
+              icon="notebook-outline"
+              iconColor={c.primary}
+            />
+            {khaataOpen ? (
+              <NumberField
+                label={t('khaata.limit')}
+                hint={t('khaata.limitHint')}
+                value={khaataLimit}
+                onChangeValue={setKhaataLimit}
+                prefix={lang === 'ur' ? undefined : 'Rs'}
+                suffix={lang === 'ur' ? 'روپے' : undefined}
+                icon="scale-balance"
+              />
+            ) : null}
             <SwitchRow
               label={t('cust.markInactive')}
               sublabel={t('cust.markInactiveSub')}

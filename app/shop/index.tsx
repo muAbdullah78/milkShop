@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 
 import {
+  AppHeader,
   Badge,
   Button,
   Chip,
@@ -80,24 +81,15 @@ export default function ShopScreen() {
   };
 
   return (
-    <Screen padded={false}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm, gap: spacing.md }}>
-        <View style={styles.titleRow}>
-          <View style={{ flex: 1 }}>
-            <Txt variant="display" weight="700">
-              {t('nav.shop')}
-            </Txt>
-            <Txt variant="caption" muted>
-              {t('cat.itemsCount', { count: num(products.length) })}
-            </Txt>
-          </View>
-          <Pressable
-            onPress={() => router.push('/categories')}
-            style={[styles.headBtn, { backgroundColor: c.primarySoft }]}
-          >
-            <MaterialCommunityIcons name="shape-outline" size={20} color={c.primary} />
-          </Pressable>
-        </View>
+    <Screen padded={false} edges={['top']}>
+      <AppHeader
+        title={t('nav.shop')}
+        subtitle={t('cat.itemsCount', { count: num(products.length) })}
+        back
+        actions={[{ icon: 'shape-outline', onPress: () => router.push('/categories') }]}
+      />
+
+      <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
 
         <View style={{ flexDirection: 'row', gap: spacing.md }}>
           <StatTile
@@ -349,8 +341,6 @@ function ProductCard({
 }
 
 const styles = StyleSheet.create({
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  headBtn: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   prodCard: {
     flex: 1,
     padding: spacing.md,

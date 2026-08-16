@@ -60,12 +60,19 @@ export default function MoreScreen() {
       <SectionHeader title={t('rep.summary')} icon="cash-multiple" style={{ marginTop: spacing.xxl }} />
       <ListCard>
         <ListRow
+          title={t('khaata.title')}
+          subtitle={t('khaata.subtitle')}
+          icon="notebook-outline"
+          iconColor={c.due}
+          meta={money(toCollect)}
+          metaColor={toCollect > 0 ? c.due : undefined}
+          onPress={() => router.push('/(tabs)/khaata')}
+        />
+        <ListRow
           title={t('bill.title')}
           subtitle={t('bill.subtitle')}
           icon="receipt"
           iconColor="#7C3AED"
-          meta={money(toCollect)}
-          metaColor={toCollect > 0 ? c.due : undefined}
           onPress={() => router.push('/bill')}
         />
         <ListRow
@@ -116,7 +123,7 @@ export default function MoreScreen() {
           subtitle={t('prod.emptySub')}
           icon="package-variant"
           iconColor={c.warning}
-          onPress={() => router.push('/(tabs)/shop')}
+          onPress={() => router.push('/shop')}
         />
       </ListCard>
 

@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,6 +23,8 @@ import {
   useDeliveriesForDay,
   useDeliveriesForMonth,
   useExpensesForMonth,
+  useInvoicesForMonth,
+  useKhaataEntriesForMonth,
   useLowStockProducts,
   usePaymentsForMonth,
   useProducts,
@@ -39,10 +41,12 @@ import {
   statsForMonth,
   topCustomersByMilk,
 } from '@/features/stats';
+import { useMonthlyCatchUp } from '@/features/useMonthlyCatchUp';
 import { useI18n } from '@/i18n';
 import { greetingKey, isScheduledOn, thisMonthKey, todayKey } from '@/lib/dates';
 import { radius, spacing, useColors } from '@/theme';
 import { withAlpha } from '@/theme/colors';
+import { useToast } from '@/components/ui';
 
 export default function Dashboard() {
   const c = useColors();
@@ -64,7 +68,18 @@ export default function Dashboard() {
   const { data: purchases } = usePurchasesForMonth(month);
   const { data: products } = useProducts();
   const { data: categories } = useCategories();
+  const { data: khaataEntries } = useKhaataEntriesForMonth(month);
+  const { data: invoices } = useInvoicesForMonth(month);
   const lowStock = useLowStockProducts();
+
+  const toast = useToast();
+  useMonthlyCatchUp(
+    customers,
+    useCallback(
+      (count: number) => toast.show(t('khaata.autoPosted', { count: num(count) }), 'info'),
+      [toast, t, num]
+    )
+  );
 
   const scheduledToday = useMemo(
     () => activeCustomers.filter((cu) => isScheduledOn(cu, today)),
@@ -86,8 +101,10 @@ export default function Dashboard() {
         expenses,
         purchases,
         customers,
+        khaataEntries,
+        invoices,
       }),
-    [month, monthDeliveries, sales, payments, expenses, purchases, customers]
+    [month, monthDeliveries, sales, payments, expenses, purchases, customers, khaataEntries, invoices]
   );
 
   const trendMilk = useMemo(() => milkTrend(monthDeliveries, 7), [monthDeliveries]);
@@ -109,6 +126,7 @@ export default function Dashboard() {
     { icon: 'cash-plus' as const, label: t('dash.takePayment'), color: c.moneyIn, href: '/payment/new' },
     { icon: 'cash-minus' as const, label: t('dash.addExpense'), color: c.moneyOut, href: '/expenses/edit' },
     { icon: 'account-plus' as const, label: t('dash.addCustomer'), color: c.accent, href: '/customer/edit' },
+    { icon: 'notebook-outline' as const, label: t('khaata.title'), color: c.due, href: '/(tabs)/khaata' },
     { icon: 'receipt' as const, label: t('dash.sendBills'), color: '#7C3AED', href: '/bill' },
     { icon: 'chart-box' as const, label: t('dash.viewReports'), color: c.info, href: '/reports' },
   ];

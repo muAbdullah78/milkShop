@@ -6,6 +6,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Avatar,
   Badge,
+  ConfirmDialog,
   BrandGradient,
   Button,
   Card,
@@ -23,7 +24,11 @@ import {
   useCustomerDeliveries,
   useCustomerPayments,
   useCustomerSales,
+  useKhaataEntries,
 } from '@/data/hooks';
+import { khaataRepo } from '@/data/repo';
+import { useShopId } from '@/data/ShopProvider';
+import { daysSince, isKhaataOpen, khaataOverLimit } from '@/features/khaata';
 import { useShop } from '@/data/ShopProvider';
 import { buildReminderMessage } from '@/features/billText';
 import { callNumber, openWhatsApp } from '@/features/whatsapp';
@@ -41,13 +46,17 @@ export default function CustomerDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t, money, qty, num, lang } = useI18n();
   const { shop } = useShop();
+  const shopId = useShopId();
 
   const { customer, loading } = useCustomer(id);
   const { data: deliveries } = useCustomerDeliveries(id);
   const { data: sales } = useCustomerSales(id);
   const { data: payments } = useCustomerPayments(id);
+  const { data: khaataEntries } = useKhaataEntries(id);
 
   const [tab, setTab] = useState<Tab>('milk');
+  const [confirmKhaata, setConfirmKhaata] = useState<'open' | 'close' | null>(null);
+  const [khaataBusy, setKhaataBusy] = useState(false);
   const month = thisMonthKey();
 
   const monthStats = useMemo(() => {
@@ -232,6 +241,12 @@ export default function CustomerDetail() {
                 onPress={() => router.push(`/sale/new?customerId=${customer.id}`)}
               />
               <QuickAction
+                icon="notebook-outline"
+                label={t('khaata.title')}
+                color={c.due}
+                onPress={() => router.push(`/khaata/${customer.id}`)}
+              />
+              <QuickAction
                 icon="receipt"
                 label={t('bill.title')}
                 color="#7C3AED"
@@ -239,6 +254,81 @@ export default function CustomerDetail() {
               />
             </View>
           </Card>
+
+          {/* Khaata — the ledger this customer's credit lives in */}
+          <SectionHeader title={t('khaata.title')} icon="notebook-outline" style={{ marginTop: spacing.xxl }} />
+          {isKhaataOpen(customer) ? (
+            <Card onPress={() => router.push(`/khaata/${customer.id}`)} style={{ gap: spacing.md }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                <View style={[styles.khaataIcon, { backgroundColor: c.primarySoft }]}>
+                  <MaterialCommunityIcons name="notebook" size={23} color={c.primary} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Txt variant="body" weight="700">
+                    {t('khaata.statementFor', { name: customer.name })}
+                  </Txt>
+                  <Txt variant="caption" muted numberOfLines={1}>
+                    {customer.khaataOpenedAt
+                      ? t('khaata.openedOn', {
+                          date: formatDayLong(
+                            new Date(customer.khaataOpenedAt).toISOString().slice(0, 10),
+                            lang
+                          ),
+                        })
+                      : t('khaata.entriesCount', { count: num(khaataEntries.length) })}
+                  </Txt>
+                </View>
+                <MaterialCommunityIcons
+                  name={lang === 'ur' ? 'chevron-left' : 'chevron-right'}
+                  size={22}
+                  color={c.textFaint}
+                />
+              </View>
+
+              {khaataOverLimit(customer) ? (
+                <View style={[styles.warn, { backgroundColor: c.dangerSoft }]}>
+                  <MaterialCommunityIcons name="alert-outline" size={17} color={c.danger} />
+                  <Txt variant="caption" weight="700" color={c.danger} style={{ flex: 1 }}>
+                    {t('khaata.overLimitBy', {
+                      amount: money(customer.balance - (customer.khaataLimit ?? 0)),
+                    })}
+                  </Txt>
+                </View>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', gap: spacing.md }}>
+                <Button
+                  label={t('khaata.tookSomething')}
+                  icon="basket-plus-outline"
+                  variant="tonal"
+                  style={{ flex: 1 }}
+                  onPress={() => router.push(`/khaata/entry?customerId=${customer.id}`)}
+                />
+                <Button
+                  label={t('khaata.close')}
+                  icon="lock-outline"
+                  variant="outline"
+                  onPress={() => setConfirmKhaata('close')}
+                />
+              </View>
+            </Card>
+          ) : (
+            <Card style={{ gap: spacing.md, alignItems: 'center' }}>
+              <MaterialCommunityIcons name="notebook-outline" size={32} color={c.textFaint} />
+              <Txt variant="body" weight="700" align="center">
+                {t('khaata.notOpen')}
+              </Txt>
+              <Txt variant="caption" muted align="center">
+                {t('khaata.notOpenSub')}
+              </Txt>
+              <Button
+                label={t('khaata.open')}
+                icon="notebook-plus-outline"
+                full
+                onPress={() => setConfirmKhaata('open')}
+              />
+            </Card>
+          )}
 
           {/* This month */}
           <SectionHeader
@@ -325,6 +415,39 @@ export default function CustomerDetail() {
           />
         </View>
       </ScrollView>
+
+      <ConfirmDialog
+        visible={confirmKhaata !== null}
+        title={
+          confirmKhaata === 'close'
+            ? t('khaata.closeQ', { name: customer.name })
+            : t('khaata.openQ', { name: customer.name })
+        }
+        message={confirmKhaata === 'close' ? t('khaata.closeInfo') : t('khaata.openInfo')}
+        confirmLabel={confirmKhaata === 'close' ? t('khaata.close') : t('khaata.open')}
+        cancelLabel={t('common.cancel')}
+        destructive={confirmKhaata === 'close'}
+        loading={khaataBusy}
+        onConfirm={async () => {
+          if (!shopId || !confirmKhaata) return;
+          setKhaataBusy(true);
+          try {
+            if (confirmKhaata === 'close') {
+              await khaataRepo.close(shopId, customer.id);
+              toast.success(t('khaata.closed'));
+            } else {
+              await khaataRepo.open(shopId, customer.id);
+              toast.success(t('khaata.opened'));
+            }
+          } catch {
+            toast.error(t('err.saveFailed'));
+          } finally {
+            setKhaataBusy(false);
+            setConfirmKhaata(null);
+          }
+        }}
+        onCancel={() => setConfirmKhaata(null)}
+      />
     </Screen>
   );
 }
@@ -391,5 +514,7 @@ const styles = StyleSheet.create({
   quickAction: { flex: 1, alignItems: 'center', gap: 5 },
   quickIcon: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   hr: { height: StyleSheet.hairlineWidth, marginVertical: spacing.lg },
+  khaataIcon: { width: 46, height: 46, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  warn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: 12 },
   sep: { height: StyleSheet.hairlineWidth, marginStart: spacing.lg + 50 },
 });

@@ -146,6 +146,26 @@ export function formatDayShort(key: string): string {
   return format(parseDay(key), 'd MMM');
 }
 
+/** `3:45 PM` / `3:45 شام` — the time a khaata line was written. */
+export function formatTime(ts: number, lang: 'en' | 'ur'): string {
+  const d = new Date(ts);
+  const h24 = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  if (lang === 'en') return `${h12}:${m} ${h24 < 12 ? 'AM' : 'PM'}`;
+  const period = h24 < 12 ? 'صبح' : h24 < 16 ? 'دوپہر' : h24 < 19 ? 'شام' : 'رات';
+  return `${h12}:${m} ${period}`;
+}
+
+/** "Today 3:45 PM" / "12 Aug, 3:45 PM" — compact stamp for ledger rows. */
+export function formatStamp(ts: number, lang: 'en' | 'ur'): string {
+  const key = dayKey(new Date(ts));
+  const time = formatTime(ts, lang);
+  if (isToday(key)) return `${lang === 'ur' ? 'آج' : 'Today'} · ${time}`;
+  if (key === shiftDay(todayKey(), -1)) return `${lang === 'ur' ? 'کل' : 'Yesterday'} · ${time}`;
+  return `${formatDayLong(key, lang).replace(/ \d{4}$/, '')} · ${time}`;
+}
+
 export function greetingKey(): 'dash.greetMorning' | 'dash.greetAfternoon' | 'dash.greetEvening' {
   const h = new Date().getHours();
   if (h < 12) return 'dash.greetMorning';

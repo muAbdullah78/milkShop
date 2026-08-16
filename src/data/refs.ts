@@ -15,6 +15,7 @@ export const COL = {
   purchases: 'purchases',
   supplierPayments: 'supplierPayments',
   invoices: 'invoices',
+  khaataEntries: 'khaataEntries',
 } as const;
 
 export type ColName = (typeof COL)[keyof typeof COL];

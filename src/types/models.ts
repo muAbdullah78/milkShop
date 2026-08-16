@@ -50,6 +50,20 @@ export type Customer = WithId & {
   openingBalance: number;
   /** Cached running balance: positive = customer owes the shop. */
   balance: number;
+  /**
+   * Whether this customer has an open khaata (ledger). Nothing can go on
+   * credit until the shopkeeper opens one — that is the deliberate moment
+   * where they decide to trust someone.
+   *
+   * Undefined on records written before khaatas existed, which are treated
+   * as open so no history is stranded.
+   */
+  khaataOpen?: boolean;
+  khaataOpenedAt?: number;
+  khaataClosedAt?: number;
+  /** Optional ceiling; the app warns past it but never blocks a sale. */
+  khaataLimit?: number;
+  khaataNote?: string;
   active: boolean;
   notes?: string;
   createdAt: number;
@@ -197,6 +211,46 @@ export type SupplierPayment = WithId & {
   createdAt: number;
 };
 
+/**
+ * A hand-written line in the khaata: "took 2 dozen eggs, Rs 700".
+ *
+ * Milk deliveries, credit sales and payments already produce their own
+ * records and show up in the ledger automatically — this type is for the
+ * everyday case of a customer picking something up off the counter that the
+ * shopkeeper just wants written down, exactly like the paper book.
+ */
+export type KhaataEntry = WithId & {
+  date: string;
+  month: string;
+  /** Exact moment it happened — the ledger shows the time of day. */
+  ts: number;
+  customerId: string;
+  customerName: string;
+  /** `debit` = they took something. `credit` = a discount or a correction. */
+  kind: 'debit' | 'credit';
+  title: string;
+  amount: number;
+  /** Optional itemisation when picked from the catalogue. */
+  items?: { name: string; qty: number; unit: Unit; price: number }[];
+  note?: string;
+  createdAt: number;
+};
+
+/** One row of the merged khaata ledger, newest first in the UI. */
+export type LedgerRow = {
+  id: string;
+  ts: number;
+  date: string;
+  source: 'opening' | 'milk' | 'sale' | 'khaata' | 'payment' | 'monthly';
+  title: string;
+  subtitle?: string;
+  /** Positive = they owe more. Negative = they owe less. */
+  delta: number;
+  /** What they owed immediately after this row. */
+  balanceAfter: number;
+  refId?: string;
+};
+
 export type InvoiceStatus = 'draft' | 'sent' | 'paid';
 
 export type Invoice = WithId & {
@@ -217,6 +271,9 @@ export type Invoice = WithId & {
    * running balance. Guarantees the charge is posted exactly once per month.
    */
   chargePosted?: boolean;
+  /** The exact amount posted, frozen at posting time. */
+  chargeAmount?: number;
+  chargePostedAt?: number;
   sentAt?: number;
   createdAt: number;
   updatedAt: number;

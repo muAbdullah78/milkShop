@@ -84,6 +84,7 @@ function AppChrome() {
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="customer/edit" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="khaata/entry" options={{ presentation: 'modal' }} />
         <Stack.Screen name="sale/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="payment/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="expenses/edit" options={{ presentation: 'modal' }} />

@@ -24,6 +24,8 @@ import {
   useDeliveriesForMonth,
   useExpenseCategories,
   useExpensesForMonth,
+  useInvoicesForMonth,
+  useKhaataEntriesForMonth,
   usePaymentsForMonth,
   useProducts,
   usePurchasesForMonth,
@@ -59,10 +61,23 @@ export default function ReportsScreen() {
   const { data: products } = useProducts();
   const { data: categories } = useCategories();
   const { data: expenseCats } = useExpenseCategories();
+  const { data: khaataEntries } = useKhaataEntriesForMonth(month);
+  const { data: invoices } = useInvoicesForMonth(month);
 
   const stats = useMemo(
-    () => statsForMonth({ month, deliveries, sales, payments, expenses, purchases, customers }),
-    [month, deliveries, sales, payments, expenses, purchases, customers]
+    () =>
+      statsForMonth({
+        month,
+        deliveries,
+        sales,
+        payments,
+        expenses,
+        purchases,
+        customers,
+        khaataEntries,
+        invoices,
+      }),
+    [month, deliveries, sales, payments, expenses, purchases, customers, khaataEntries, invoices]
   );
 
   const trendMilk = useMemo(() => {

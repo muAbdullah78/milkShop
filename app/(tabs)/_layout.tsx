@@ -10,7 +10,7 @@ import { spacing, useColors } from '@/theme';
 
 type TabDef = {
   name: string;
-  labelKey: 'nav.home' | 'nav.delivery' | 'nav.customers' | 'nav.shop' | 'nav.more';
+  labelKey: 'nav.home' | 'nav.delivery' | 'nav.customers' | 'nav.khaata' | 'nav.more';
   icon: keyof typeof MaterialCommunityIcons.glyphMap;
   iconActive: keyof typeof MaterialCommunityIcons.glyphMap;
 };
@@ -18,8 +18,8 @@ type TabDef = {
 const TABS: TabDef[] = [
   { name: 'index', labelKey: 'nav.home', icon: 'view-dashboard-outline', iconActive: 'view-dashboard' },
   { name: 'delivery', labelKey: 'nav.delivery', icon: 'truck-outline', iconActive: 'truck' },
+  { name: 'khaata', labelKey: 'nav.khaata', icon: 'notebook-outline', iconActive: 'notebook' },
   { name: 'customers', labelKey: 'nav.customers', icon: 'account-group-outline', iconActive: 'account-group' },
-  { name: 'shop', labelKey: 'nav.shop', icon: 'storefront-outline', iconActive: 'storefront' },
   { name: 'more', labelKey: 'nav.more', icon: 'dots-grid', iconActive: 'dots-grid' },
 ];
 
