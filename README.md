@@ -170,10 +170,72 @@ agrees, and a windowed view still adds up. It runs clean across randomized shops
 
 ---
 
+## Three pieces, one project
+
+| | Where | What it is |
+|---|---|---|
+| **The app** | `app/`, `src/` | The Android app the shopkeeper uses. |
+| **The website** | `web/src/pages/` | Public marketing site, privacy policy, terms, and the account-deletion page Play requires. |
+| **The super admin** | `web/src/admin/` | The console you run the platform from. |
+
+### The website
+
+Eleven pages, bilingual, at `/`. It exists partly because it is genuinely useful and
+partly because Play will not accept the app without it: Google requires a **publicly
+reachable privacy policy** and a **public page where anyone can request account
+deletion**, both without a login. Those are `/privacy` and `/delete-account`.
+
+```bash
+cd web
+cp .env.example .env      # Firebase web config — public identifiers, not secrets
+npm install
+npm run build
+cd .. && firebase deploy --only hosting
+```
+
+### The super admin console
+
+At `/admin`, behind Firebase Auth. Who can open it is decided by one thing: whether
+a document exists at `admins/{uid}`. That is the same question the Firestore rules
+ask, so the interface cannot grant itself anything the rules do not already allow.
+
+- **Overview** — shops, active this week, growth per month, platform-wide record counts
+  (server-side `count()` aggregations, so it stays one billed read each however large
+  it gets).
+- **Shops** — search, per-collection counts, internal notes, suspend and restore.
+- **Platform** — the dashboard banner every install sees, maintenance mode, minimum
+  app version, and feature switches. Owner-only.
+- **Requests** — support messages sent from inside the app, and deletion requests
+  from the website.
+- **Admins** — the roster, with owner and staff roles.
+- **Audit log** — every admin action, append-only.
+
+Two deliberate limits, both enforced in `firestore.rules` rather than in the UI:
+
+**An admin can read a shop but can never write to it.** Support needs to see a khaata
+to answer a question about it. Support must never be able to change what a customer
+owes — if that were possible, the shopkeeper's ledger would only be as trustworthy as
+our access control, and the whole point of the khaata is that it settles arguments.
+
+**Only an owner can touch anything that reaches the app.** Maintenance mode blocks
+every shop in the country. That is not a support-desk button.
+
+The remote controls live in one world-readable `platform/config` document holding only
+flags and copy — never shop data — which the app subscribes to. It drives the
+announcement banner, a forced-update prompt below a minimum `versionCode`, maintenance
+mode, and four feature switches. Each switch is wired to something real; a toggle that
+silently does nothing is worse than no toggle.
+
+---
+
 ## Getting it running
 
-See **[SETUP.md](./SETUP.md)** — Firebase project, security rules, EAS build, and
-Play Store submission, step by step.
+See **[SETUP.md](./SETUP.md)** — Firebase project, security rules, EAS build.
+
+For publishing, **[PLAYSTORE.md](./PLAYSTORE.md)** is the complete route: every manual
+step before you open Play Console, then Play Console click by click, including the
+Data safety answers, the content rating answers, and the signing-key mistake that
+breaks Google Sign-In for every real user while working perfectly on your own phone.
 
 Short version:
 

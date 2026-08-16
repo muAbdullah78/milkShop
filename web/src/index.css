@@ -1,0 +1,105 @@
+@import 'tailwindcss';
+
+/*
+  The website reuses the app's identity so the two feel like one product:
+  deep navy brand, interactive blue, amber for money owed.
+*/
+@theme {
+  --color-ink: #0b1b3a;
+  --color-ink-muted: #5a6b8c;
+  --color-ink-faint: #93a2be;
+
+  --color-brand: #12246b;
+  --color-brand-deep: #0b1740;
+  --color-primary: #1b3fcb;
+  --color-primary-soft: #e7edff;
+
+  --color-accent: #0fb5a5;
+  --color-accent-soft: #def7f4;
+  --color-due: #b45309;
+  --color-money-in: #0e8f47;
+  --color-money-in-soft: #e1f6ea;
+  --color-danger: #cc2e33;
+  --color-danger-soft: #fde7e8;
+  --color-warning: #b45309;
+  --color-warning-soft: #fdf1d9;
+
+  --color-page: #f2f6fc;
+  --color-surface: #ffffff;
+  --color-line: #e2e9f5;
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-urdu: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Noto Naskh Arabic', serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Urdu needs a much taller line box or the Nastaliq glyphs collide. */
+[dir='rtl'] {
+  font-family: var(--font-urdu);
+  line-height: 2.1;
+}
+
+[dir='rtl'] .num,
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.prose-legal h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: 2.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-ink);
+}
+
+.prose-legal h3 {
+  font-size: 1.02rem;
+  font-weight: 700;
+  margin-top: 1.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.prose-legal p,
+.prose-legal li {
+  color: var(--color-ink-muted);
+  line-height: 1.75;
+  margin-bottom: 0.75rem;
+}
+
+.prose-legal ul {
+  list-style: disc;
+  padding-inline-start: 1.4rem;
+  margin-bottom: 1rem;
+}
+
+.prose-legal strong {
+  color: var(--color-ink);
+  font-weight: 650;
+}
+
+.prose-legal a {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

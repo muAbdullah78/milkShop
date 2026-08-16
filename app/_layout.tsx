@@ -9,9 +9,11 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LockScreen } from '@/components/LockScreen';
+import { PlatformGate } from '@/components/PlatformGate';
 import { ToastProvider } from '@/components/ui';
 import { AuthProvider } from '@/data/AuthProvider';
 import { LockProvider, useLock } from '@/data/LockProvider';
+import { PlatformProvider } from '@/data/PlatformProvider';
 import { ShopProvider } from '@/data/ShopProvider';
 import { I18nProvider, useI18n } from '@/i18n';
 import { ThemeProvider, useColors, useTheme } from '@/theme';
@@ -35,11 +37,13 @@ export default function RootLayout() {
           <I18nProvider>
             <AuthProvider>
               <ShopProvider>
-                <LockProvider>
-                  <ToastProvider>
-                    <AppChrome />
-                  </ToastProvider>
-                </LockProvider>
+                <PlatformProvider>
+                  <LockProvider>
+                    <ToastProvider>
+                      <AppChrome />
+                    </ToastProvider>
+                  </LockProvider>
+                </PlatformProvider>
               </ShopProvider>
             </AuthProvider>
           </I18nProvider>
@@ -93,6 +97,8 @@ function AppChrome() {
         <Stack.Screen name="purchases/new" options={{ presentation: 'modal' }} />
       </Stack>
 
+      {/* Order matters: the PIN sits above everything, then platform blocks. */}
+      <PlatformGate />
       {enabled && locked ? <LockScreen /> : null}
     </View>
   );

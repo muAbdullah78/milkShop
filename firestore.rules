@@ -4,7 +4,12 @@ rules_version = '2';
 // ----------------------
 // Everything a shop owns lives under shops/{shopId}. A signed-in user may only
 // touch a shop whose memberUids contains their uid, so two shops installed from
-// the same Play listing can never see each other's khata.
+// the same Play listing can never see each other's khaata.
+//
+// A super admin is an entry in admins/{uid}. Admins can read across shops for
+// support, and can flip a shop's `suspended` flag, but the rules deliberately
+// stop them rewriting a shop's khaata — support should never be able to
+// silently change what a customer owes.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -13,13 +18,86 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function adminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.uid)).data;
+    }
+
+    function isOwnerAdmin() {
+      return isAdmin() && adminData().role == 'owner';
+    }
+
     function shopMembers(shopId) {
       return get(/databases/$(database)/documents/shops/$(shopId)).data.memberUids;
     }
 
+    function isMemberOf(shopId) {
+      return signedIn() && request.auth.uid in shopMembers(shopId);
+    }
+
+    // Only these fields may be touched by an admin on a shop document.
+    function onlyModeratesShop() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['suspended', 'suspensionReason', 'suspendedAt', 'adminNote', 'plan', 'updatedAt']);
+    }
+
+    // ── Platform config: read by every install, written by owner admins ─────
+    match /platform/{docId} {
+      allow read: if true;
+      allow write: if isOwnerAdmin();
+    }
+
+    // ── Admin roster. Readable by admins; only an owner can grant a role. ───
+    match /admins/{uid} {
+      allow read: if isAdmin();
+      allow create, update, delete: if isOwnerAdmin();
+    }
+
+    // ── Append-only audit trail of everything admins do ─────────────────────
+    match /adminAudit/{entryId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.actorUid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ── Support inbox: anyone signed in may open a ticket about their shop ──
+    match /supportTickets/{ticketId} {
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if isOwnerAdmin();
+    }
+
+    // ── Account-deletion requests raised from the website ───────────────────
+    // Written by the public web form; only admins can read or resolve them.
+    match /deletionRequests/{requestId} {
+      allow create: if request.resource.data.keys().hasOnly(['email', 'note', 'createdAt', 'status'])
+        && request.resource.data.status == 'open'
+        && request.resource.data.email is string
+        && request.resource.data.email.size() < 200;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ── Cross-shop reads for the admin console ─────────────────────────────
+    // Nested rules do not authorise collection-group queries, so the platform
+    // metrics need these. Read-only, admins only, and they grant nothing that
+    // an admin cannot already read one shop at a time.
+    match /{path=**}/customers/{docId}     { allow read: if isAdmin(); }
+    match /{path=**}/deliveries/{docId}    { allow read: if isAdmin(); }
+    match /{path=**}/sales/{docId}         { allow read: if isAdmin(); }
+    match /{path=**}/payments/{docId}      { allow read: if isAdmin(); }
+    match /{path=**}/khaataEntries/{docId} { allow read: if isAdmin(); }
+
     // Each user document only points at the shop they belong to.
     match /users/{uid} {
-      allow read, write: if signedIn() && request.auth.uid == uid;
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow write: if signedIn() && request.auth.uid == uid;
+      allow delete: if (signedIn() && request.auth.uid == uid) || isOwnerAdmin();
     }
 
     match /shops/{shopId} {
@@ -27,17 +105,23 @@ service cloud.firestore {
         && request.resource.data.ownerUid == request.auth.uid
         && request.auth.uid in request.resource.data.memberUids;
 
-      allow read: if signedIn() && request.auth.uid in resource.data.memberUids;
+      allow read: if isMemberOf(shopId) || isAdmin();
 
-      allow update: if signedIn()
-        && request.auth.uid in resource.data.memberUids
-        && request.auth.uid in request.resource.data.memberUids;
+      // Members may edit their own shop. Admins may only moderate it.
+      allow update: if (
+          signedIn()
+          && request.auth.uid in resource.data.memberUids
+          && request.auth.uid in request.resource.data.memberUids
+        ) || (isAdmin() && onlyModeratesShop());
 
-      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow delete: if (signedIn() && resource.data.ownerUid == request.auth.uid) || isOwnerAdmin();
 
-      // customers, deliveries, sales, payments, expenses, suppliers, …
+      // customers, deliveries, sales, payments, khaataEntries, …
       match /{document=**} {
-        allow read, write: if signedIn() && request.auth.uid in shopMembers(shopId);
+        // Shop members read and write. Admins may read for support but never
+        // write — a support login must not be able to alter a khaata.
+        allow read: if isMemberOf(shopId) || isAdmin();
+        allow write: if isMemberOf(shopId);
       }
     }
   }

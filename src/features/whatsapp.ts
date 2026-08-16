@@ -7,6 +7,22 @@ import { toWhatsAppNumber } from '@/lib/format';
 export type WhatsAppResult = 'opened' | 'no-number' | 'not-installed' | 'failed';
 
 /**
+ * Whether to try the `whatsapp://` scheme before the web link.
+ *
+ * Held at module level rather than passed down because seven different
+ * screens open WhatsApp, and threading a flag through all of them would be
+ * seven chances to forget one. `PlatformProvider` keeps it in step with the
+ * `whatsappDirect` switch in the admin console, so if a future WhatsApp or
+ * Android release breaks the direct scheme, every phone can be moved onto the
+ * web link without shipping an update.
+ */
+let useDirectScheme = true;
+
+export function setWhatsAppDirectScheme(on: boolean): void {
+  useDirectScheme = on;
+}
+
+/**
  * Opens a WhatsApp chat with a prefilled message.
  *
  * `whatsapp://send` goes straight into the chat when the app is installed.
@@ -23,7 +39,7 @@ export async function openWhatsApp(phone: string | null | undefined, text: strin
   const web = `https://wa.me/${number}?text=${encoded}`;
 
   try {
-    const canDirect = await RNLinking.canOpenURL(direct).catch(() => false);
+    const canDirect = useDirectScheme && (await RNLinking.canOpenURL(direct).catch(() => false));
     if (canDirect) {
       await RNLinking.openURL(direct);
       return 'opened';

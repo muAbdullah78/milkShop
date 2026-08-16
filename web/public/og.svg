@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0B1740" />
+      <stop offset="55%" stop-color="#12246B" />
+      <stop offset="100%" stop-color="#1B3FCB" />
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2F72E8" />
+      <stop offset="100%" stop-color="#0FB5A5" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <circle cx="1040" cy="120" r="230" fill="#2F72E8" opacity="0.16" />
+  <circle cx="150" cy="560" r="180" fill="#0FB5A5" opacity="0.14" />
+
+  <g transform="translate(90 150)">
+    <rect width="86" height="86" rx="22" fill="url(#mark)" />
+    <path
+      d="M30 20h26M33 20l-1.9 15.6a11 11 0 0 1-1.5 4.4l-3.4 5.6a12 12 0 0 0-1.7 6.1V66a6 6 0 0 0 6 6h21a6 6 0 0 0 6-6V51.7a12 12 0 0 0-1.7-6.1l-3.4-5.6a11 11 0 0 1-1.5-4.4L53 20"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="4.4"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+
+  <text x="200" y="208" fill="#FFFFFF" font-family="Inter, Segoe UI, sans-serif" font-size="62" font-weight="800">
+    MilkBook
+  </text>
+
+  <text x="90" y="330" fill="#FFFFFF" font-family="Inter, Segoe UI, sans-serif" font-size="58" font-weight="800">
+    Khaata, milk round and monthly
+  </text>
+  <text x="90" y="404" fill="#FFFFFF" font-family="Inter, Segoe UI, sans-serif" font-size="58" font-weight="800">
+    bills — all on your phone.
+  </text>
+
+  <text x="90" y="470" fill="#B9C8EC" font-family="Inter, Segoe UI, sans-serif" font-size="30" font-weight="500">
+    Free for Pakistani milk shops · English and Urdu · Works offline
+  </text>
+
+  <g transform="translate(90 516)">
+    <rect width="252" height="62" rx="31" fill="#FFFFFF" />
+    <text x="126" y="40" fill="#12246B" text-anchor="middle" font-family="Inter, Segoe UI, sans-serif" font-size="24" font-weight="800">
+      Get it on Android
+    </text>
+  </g>
+</svg>

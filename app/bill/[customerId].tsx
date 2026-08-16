@@ -25,6 +25,7 @@ import {
 } from '@/data/hooks';
 import { invoiceRepo } from '@/data/repo';
 import { useLock } from '@/data/LockProvider';
+import { usePlatform } from '@/data/PlatformProvider';
 import { useShop, useShopId } from '@/data/ShopProvider';
 import { billImageName, shareBillPdf, shareViewAsImage } from '@/features/billExport';
 import { buildBill } from '@/features/billing';
@@ -41,6 +42,7 @@ export default function BillDetail() {
   const shopId = useShopId();
   const { shop } = useShop();
   const { beginExternalAction } = useLock();
+  const { isEnabled } = usePlatform();
   const { t, money, qty, num, lang } = useI18n();
   const { customerId } = useLocalSearchParams<{ customerId: string }>();
 
@@ -215,16 +217,18 @@ export default function BillDetail() {
             onPress={sendText}
           />
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
-            <Button
-              label={t('bill.sendPdf')}
-              icon="file-pdf-box"
-              variant="tonal"
-              size="lg"
-              style={{ flex: 1 }}
-              loading={busy === 'pdf'}
-              disabled={busy !== null}
-              onPress={sendPdf}
-            />
+            {isEnabled('pdfBill') ? (
+              <Button
+                label={t('bill.sendPdf')}
+                icon="file-pdf-box"
+                variant="tonal"
+                size="lg"
+                style={{ flex: 1 }}
+                loading={busy === 'pdf'}
+                disabled={busy !== null}
+                onPress={sendPdf}
+              />
+            ) : null}
             <Button
               label={t('bill.sendImage')}
               icon="image-outline"
