@@ -15,7 +15,7 @@ export type BillInputs = {
   deliveries: Delivery[];
   sales: Sale[];
   payments: Payment[];
-  invoice?: Invoice & { chargePosted?: boolean };
+  invoice?: Invoice;
 };
 
 /**
@@ -117,7 +117,7 @@ export function buildAllBills(input: {
   deliveries: Delivery[];
   sales: Sale[];
   payments: Payment[];
-  invoices: (Invoice & { chargePosted?: boolean })[];
+  invoices: Invoice[];
 }): BillSummary[] {
   const invoiceByCustomer = new Map(input.invoices.map((i) => [i.customerId, i]));
 

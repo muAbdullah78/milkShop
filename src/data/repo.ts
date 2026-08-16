@@ -787,7 +787,7 @@ export const invoiceRepo = {
     const existing = await getDoc(ref);
     const alreadyPosted = existing.exists() ? Boolean(existing.data()?.chargePosted) : false;
 
-    const row: Omit<Invoice, 'id'> & { chargePosted: boolean } = {
+    const row: Omit<Invoice, 'id'> = {
       month: input.month,
       customerId: input.customer.id,
       customerName: input.customer.name,

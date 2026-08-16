@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import React, { useEffect, useRef } from 'react';
 import {
   Animated,
@@ -53,7 +53,6 @@ export function Sheet({
 
   const translateY = slide.interpolate({ inputRange: [0, 1], outputRange: [40, 0] });
 
-  const Body = scrollable ? ScrollView : View;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -95,15 +94,18 @@ export function Sheet({
             </View>
           ) : null}
 
-          <Body
-            style={scrollable ? { flexGrow: 0 } : undefined}
-            contentContainerStyle={scrollable ? { paddingHorizontal: spacing.lg, paddingBottom: spacing.md } : undefined}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            {...(!scrollable ? { style: { paddingHorizontal: spacing.lg } } : {})}
-          >
-            {children}
-          </Body>
+          {scrollable ? (
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={{ paddingHorizontal: spacing.lg }}>{children}</View>
+          )}
 
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </Animated.View>

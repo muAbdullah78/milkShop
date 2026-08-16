@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';

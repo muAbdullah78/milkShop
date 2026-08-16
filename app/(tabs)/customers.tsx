@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';

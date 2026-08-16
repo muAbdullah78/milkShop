@@ -76,10 +76,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       'android.permission.INTERNET',
       'android.permission.VIBRATE',
       'android.permission.POST_NOTIFICATIONS',
-      'android.permission.CAMERA',
-      'android.permission.READ_MEDIA_IMAGES',
     ],
-    blockedPermissions: ['android.permission.RECORD_AUDIO'],
+    // MilkBook never records audio, takes photos or reads the gallery.
+    // Stripping these keeps the Play listing honest and the review quick.
+    blockedPermissions: [
+      'android.permission.RECORD_AUDIO',
+      'android.permission.CAMERA',
+      'android.permission.READ_MEDIA_AUDIO',
+      'android.permission.READ_MEDIA_VIDEO',
+      'android.permission.READ_MEDIA_VISUAL_USER_SELECTED',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+    ],
   },
   extra: {
     hasGoogleServices,
@@ -93,7 +100,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     '@react-native-firebase/auth',
     '@react-native-google-signin/google-signin',
     'expo-secure-store',
-    'expo-web-browser',
     [
       'expo-build-properties',
       {
@@ -114,13 +120,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         resizeMode: 'contain',
         backgroundColor: '#12246B',
         dark: { backgroundColor: '#070D1C' },
-      },
-    ],
-    [
-      'expo-image-picker',
-      {
-        photosPermission: 'MilkBook uses your photos so you can set your shop logo.',
-        cameraPermission: 'MilkBook uses the camera so you can take a shop or customer photo.',
       },
     ],
     [

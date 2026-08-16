@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {

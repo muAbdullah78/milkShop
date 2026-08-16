@@ -50,14 +50,13 @@ export function formatMoneyShort(value: number, o: FormatOpts): string {
   return localizeDigits(sign + body, o.urduDigits);
 }
 
-/** Quantities: keeps 0.5 / 1.25 readable, drops pointless `.0`. */
+/** Quantities: keeps 0.5 / 1.25 readable, drops pointless trailing zeros. */
 export function formatQty(value: number, o: FormatOpts): string {
   const rounded = Math.round((value + Number.EPSILON) * 1000) / 1000;
-  const isInt = Math.abs(rounded % 1) < 0.0005;
-  return formatNumber(rounded, o, isInt ? 0 : rounded * 100 % 10 === 0 ? 2 : 3).replace(
-    /(\.\d*?)0+$/,
-    '$1'
-  ).replace(/\.$/, '');
+  const sign = rounded < 0 ? '-' : '';
+  // Trim in Latin digits first — the trailing-zero regex cannot see ۰۱۲۳.
+  const trimmed = groupPk(rounded, 3).replace(/\.?0+$/, '');
+  return localizeDigits(sign + (trimmed || '0'), o.urduDigits);
 }
 
 export function formatPercent(value: number, o: FormatOpts): string {

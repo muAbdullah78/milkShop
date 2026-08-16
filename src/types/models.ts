@@ -212,6 +212,11 @@ export type Invoice = WithId & {
   paidInMonth: number;
   total: number;
   status: InvoiceStatus;
+  /**
+   * True once a fixed-monthly customer's flat charge has been added to their
+   * running balance. Guarantees the charge is posted exactly once per month.
+   */
+  chargePosted?: boolean;
   sentAt?: number;
   createdAt: number;
   updatedAt: number;

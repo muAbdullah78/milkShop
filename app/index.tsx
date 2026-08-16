@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Redirect } from 'expo-router';
 import React from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
