@@ -10,11 +10,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { LockScreen } from '@/components/LockScreen';
 import { PlatformGate } from '@/components/PlatformGate';
+import { SubscriptionGate } from '@/components/SubscriptionGate';
 import { ToastProvider } from '@/components/ui';
 import { AuthProvider } from '@/data/AuthProvider';
 import { LockProvider, useLock } from '@/data/LockProvider';
 import { PlatformProvider } from '@/data/PlatformProvider';
 import { ShopProvider } from '@/data/ShopProvider';
+import { SubscriptionProvider } from '@/data/SubscriptionProvider';
 import { I18nProvider, useI18n } from '@/i18n';
 import { ThemeProvider, useColors, useTheme } from '@/theme';
 import { fontAssets } from '@/theme/fonts';
@@ -38,11 +40,13 @@ export default function RootLayout() {
             <AuthProvider>
               <ShopProvider>
                 <PlatformProvider>
-                  <LockProvider>
-                    <ToastProvider>
-                      <AppChrome />
-                    </ToastProvider>
-                  </LockProvider>
+                  <SubscriptionProvider>
+                    <LockProvider>
+                      <ToastProvider>
+                        <AppChrome />
+                      </ToastProvider>
+                    </LockProvider>
+                  </SubscriptionProvider>
                 </PlatformProvider>
               </ShopProvider>
             </AuthProvider>
@@ -99,6 +103,7 @@ function AppChrome() {
 
       {/* Order matters: the PIN sits above everything, then platform blocks. */}
       <PlatformGate />
+      <SubscriptionGate />
       {enabled && locked ? <LockScreen /> : null}
     </View>
   );

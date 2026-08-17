@@ -10,12 +10,14 @@
  */
 export const site = {
   appName: 'MilkBook',
+  /** The full Play Store listing name. Max 30 characters. */
+  storeName: 'MilkBook - Doodh Dahi Khata',
   appNameUr: 'ملک بک',
   tagline: 'Your milk shop, in your pocket',
   taglineUr: 'آپ کی دودھ کی دکان، آپ کی جیب میں',
 
   /** The legal publisher. An individual's full name is fine. */
-  publisher: 'MilkBook',
+  publisher: 'Usconnect Solutions',
 
   /** A mailbox you actually read — Google emails it and users write to it. */
   supportEmail: 'support@milkbook.app',
@@ -24,7 +26,7 @@ export const site = {
   /** No trailing slash. */
   url: 'https://milkbook.app',
 
-  androidPackage: 'com.milkbook.app',
+  androidPackage: 'com.usconnect.milkbook',
 
   /** Country whose law governs the terms. */
   jurisdiction: 'Pakistan',

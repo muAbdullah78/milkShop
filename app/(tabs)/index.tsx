@@ -31,6 +31,7 @@ import {
   usePurchasesForMonth,
   useSalesForMonth,
 } from '@/data/hooks';
+import { SubscriptionBanner } from '@/components/SubscriptionGate';
 import { useShop } from '@/data/ShopProvider';
 import {
   customersWithDues,
@@ -173,6 +174,10 @@ export default function Dashboard() {
 
       {/* ── Milk round card ──────────────────────────────────────────────── */}
       <View style={styles.body}>
+        {/* Subscription state first — it is the one thing that stops the app
+            working, so it outranks anything we want to tell them. */}
+        <SubscriptionBanner />
+
         {/* Announcement pushed from the admin console */}
         {platform?.announcement?.active && platform.announcement.title ? (
           <View

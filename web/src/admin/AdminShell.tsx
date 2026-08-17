@@ -7,6 +7,8 @@ import { useAdmin } from './useAdmin';
 const NAV = [
   { to: '/admin', end: true, label: 'Overview', icon: 'M3 12h7V3H3zM14 21h7v-9h-7zM14 3v6h7V3zM3 21h7v-6H3z' },
   { to: '/admin/shops', label: 'Shops', icon: 'M3 9 5 3h14l2 6M4 9v11h16V9M9 20v-6h6v6' },
+  { to: '/admin/subscriptions', label: 'Subscriptions', icon: 'M2 7h20v12H2zM2 11h20M6 15h4' },
+  { to: '/admin/discounts', label: 'Discounts', icon: 'M9 9h.01M15 15h.01M21 3 3 21M7 3h10a4 4 0 0 1 4 4v10' },
   { to: '/admin/platform', label: 'Platform', icon: 'M12 2v4M12 18v4M4.9 4.9l2.9 2.9M16.2 16.2l2.9 2.9M2 12h4M18 12h4M4.9 19.1l2.9-2.9M16.2 7.8l2.9-2.9' },
   { to: '/admin/requests', label: 'Requests', icon: 'M4 4h16v12H7l-3 3z' },
   { to: '/admin/people', label: 'Admins', icon: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 21v-2a4 4 0 0 0-3-3.87' },

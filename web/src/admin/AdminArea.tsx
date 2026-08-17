@@ -3,9 +3,11 @@ import { Route, Routes } from 'react-router-dom';
 import AdminShell from './AdminShell';
 import Audit from './Audit';
 import Dashboard from './Dashboard';
+import Discounts from './Discounts';
 import People from './People';
 import Platform from './Platform';
 import Requests from './Requests';
+import Subscriptions from './Subscriptions';
 import { ShopDetail, ShopsList } from './Shops';
 import { AdminProvider } from './useAdmin';
 
@@ -26,6 +28,8 @@ export default function AdminArea() {
           <Route index element={<Dashboard />} />
           <Route path="shops" element={<ShopsList />} />
           <Route path="shops/:shopId" element={<ShopDetail />} />
+          <Route path="subscriptions" element={<Subscriptions />} />
+          <Route path="discounts" element={<Discounts />} />
           <Route path="platform" element={<Platform />} />
           <Route path="requests" element={<Requests />} />
           <Route path="people" element={<People />} />

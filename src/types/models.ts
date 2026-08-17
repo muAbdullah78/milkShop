@@ -15,22 +15,43 @@ export type DeliveryStatus = 'delivered' | 'skipped';
 /** Documents live under `shops/{shopId}/…` — every record carries its own id. */
 export type WithId = { id: string };
 
-export type Shop = WithId & {
-  name: string;
-  ownerUid: string;
-  memberUids: string[];
-  ownerName?: string;
-  phone?: string;
-  address?: string;
-  logoUri?: string;
-  defaultMilkRate: number;
-  defaultMilkQty: number;
-  currency: 'PKR';
-  createdAt: number;
-  updatedAt: number;
-  /** Bumped by the app whenever the seeded catalogue schema changes. */
-  seedVersion?: number;
-};
+// Billing fields are defined in the subscription engine so the pure, tested
+// module stays the single source of truth for their shape.
+import type { ShopBilling } from '@/features/subscription';
+export type { ShopBilling };
+
+/**
+ * A shop.
+ *
+ * Note it extends `ShopBilling`. The subscription gate lives on this document
+ * rather than in its own collection because the Firestore rules already read
+ * the shop to check membership — putting the paywall here makes gating every
+ * write in the app cost zero extra document reads. The full billing history
+ * lives in `subscriptions/{shopId}`, which shop members can read but never
+ * write.
+ */
+export type Shop = WithId &
+  ShopBilling & {
+    name: string;
+    ownerUid: string;
+    memberUids: string[];
+    ownerName?: string;
+    phone?: string;
+    address?: string;
+    logoUri?: string;
+    defaultMilkRate: number;
+    defaultMilkQty: number;
+    currency: 'PKR';
+    createdAt: number;
+    updatedAt: number;
+    /** Bumped by the app whenever the seeded catalogue schema changes. */
+    seedVersion?: number;
+    /** Set by an admin from the console. Blocks the app for this shop only. */
+    suspended?: boolean;
+    suspensionReason?: string;
+    /** Only ever visible to admins. */
+    adminNote?: string;
+  };
 
 export type Customer = WithId & {
   name: string;
