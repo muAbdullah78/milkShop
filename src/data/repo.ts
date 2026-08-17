@@ -15,6 +15,7 @@ import {
 
 import { db } from '@/lib/firebase';
 import { dayKey, monthKeyOf } from '@/lib/dates';
+import { startTrial, type ShopBilling } from '@/features/subscription';
 import type {
   Category,
   Customer,
@@ -48,6 +49,7 @@ import {
   shopDoc,
   shopSubDoc,
   shopsCol,
+  trialClaimDoc,
   userDoc,
 } from './refs';
 
@@ -120,6 +122,36 @@ export const shopRepo = {
     const shopId = doc(shopsCol()).id;
     const ts = now();
 
+    /*
+     * Claim the free trial before creating the shop.
+     *
+     * This has to be its own write, committed first, and not part of the batch
+     * below: the security rule for creating a shop calls `get()` on the claim,
+     * and a `get()` inside rules sees the database as it was *before* the
+     * batch, so a claim written in the same batch would not exist yet.
+     *
+     * The claim is immutable once written and names this exact shop, which is
+     * what stops someone deleting their shop and helping themselves to a
+     * second seven days. If a claim already exists — a returning user, or a
+     * second shop on one account — the write is refused and the shop is
+     * created locked instead, for an admin to activate.
+     */
+    let billing: ShopBilling;
+    try {
+      await setDoc(trialClaimDoc(uid), { shopId, claimedAt: ts });
+      billing = startTrial(ts);
+    } catch {
+      billing = {
+        subStatus: 'none',
+        subPlan: null,
+        subSource: 'none',
+        activeUntil: 0,
+        readOnlyUntil: 0,
+        trialUsed: true,
+        cancelAtPeriodEnd: false,
+      };
+    }
+
     const shop: Omit<Shop, 'id'> = {
       name: input.name.trim(),
       ownerUid: uid,
@@ -133,6 +165,7 @@ export const shopRepo = {
       createdAt: ts,
       updatedAt: ts,
       seedVersion: SEED_VERSION,
+      ...billing,
     };
 
     const batch = writeBatch(db());

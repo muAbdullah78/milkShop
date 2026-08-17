@@ -32,6 +32,35 @@ export function shopsCol() {
   return collection(db(), 'shops');
 }
 
+/**
+ * One free trial per account, for ever.
+ *
+ * Create-once and immutable in the security rules — the user writes it, and
+ * from then on neither they nor the app can change or remove it. Deleting the
+ * shop and starting again finds this still sitting here.
+ */
+export function trialClaimDoc(uid: string) {
+  return doc(db(), 'trialClaims', uid);
+}
+
+/** The billing record an admin maintains. Readable by the shop, never writable. */
+export function subscriptionDoc(shopId: string) {
+  return doc(db(), 'subscriptions', shopId);
+}
+
+export function subscriptionPaymentsCol(shopId: string) {
+  return collection(db(), 'subscriptions', shopId, 'payments');
+}
+
+/** "I paid by JazzCash, here is the transaction id" — an inbox, not a door. */
+export function paymentClaimsCol() {
+  return collection(db(), 'paymentClaims');
+}
+
+export function discountDoc(code: string) {
+  return doc(db(), 'discounts', code.trim().toUpperCase());
+}
+
 export function shopDoc(shopId: string) {
   return doc(db(), 'shops', shopId);
 }

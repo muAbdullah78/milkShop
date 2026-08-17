@@ -21,6 +21,7 @@ import { useAuth } from '@/data/AuthProvider';
 import { useLock } from '@/data/LockProvider';
 import { usePlatform } from '@/data/PlatformProvider';
 import { useShop } from '@/data/ShopProvider';
+import { useSubscription } from '@/data/SubscriptionProvider';
 import { useI18n } from '@/i18n';
 import { spacing, useColors, useTheme, type ThemePref } from '@/theme';
 
@@ -34,6 +35,24 @@ export default function SettingsScreen() {
   const { user, signOut } = useAuth();
   const { enabled: pinOn } = useLock();
   const { isEnabled } = usePlatform();
+  const sub = useSubscription();
+
+  const subSubtitle =
+    sub.status === 'comp'
+      ? t('sub.statusComp')
+      : sub.level === 'locked'
+        ? t('sub.statusLocked')
+        : sub.level === 'readonly'
+          ? t('sub.statusReadOnly')
+          : sub.activeUntil
+            ? (sub.isTrial ? t('sub.trialUntil') : t('sub.until')).replace(
+                '{date}',
+                new Date(sub.activeUntil).toLocaleDateString()
+              )
+            : t('sub.manageSub');
+
+  const subTone =
+    sub.level === 'full' ? (sub.shouldWarn ? c.warning : c.success) : c.danger;
 
   const [confirmOut, setConfirmOut] = useState(false);
 
@@ -60,6 +79,26 @@ export default function SettingsScreen() {
           </View>
           <Badge label={t('common.edit')} color={c.primary} />
         </Card>
+
+        {/* Subscription — the thing most likely to be the reason they opened
+            Settings at all, so it goes first. */}
+        <SectionHeader title={t('sub.title')} icon="card-account-details-outline" style={{ marginTop: spacing.xxl }} />
+        <ListCard>
+          <ListRow
+            title={t('sub.manage')}
+            subtitle={subSubtitle}
+            icon="card-account-details-outline"
+            iconColor={subTone}
+            onPress={() => router.push('/subscribe/manage')}
+          />
+          <ListRow
+            title={t('dl.title')}
+            subtitle={t('dl.sub')}
+            icon="download-outline"
+            iconColor={c.info}
+            onPress={() => router.push('/settings/export')}
+          />
+        </ListCard>
 
         {/* Appearance */}
         <SectionHeader title={t('set.appearance')} icon="palette-outline" style={{ marginTop: spacing.xxl }} />

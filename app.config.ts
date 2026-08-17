@@ -51,7 +51,8 @@ const googleWebClientId = readGoogleWebClientId();
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'MilkBook',
+  // The Play listing name. 27 of the 30 characters Play allows.
+  name: 'MilkBook - Doodh Dahi Khata',
   slug: 'milkbook',
   scheme: 'milkbook',
   version: '1.0.0',
@@ -63,7 +64,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   assetBundlePatterns: ['**/*'],
   platforms: ['android'],
   android: {
-    package: 'com.milkbook.app',
+    package: 'com.usconnect.milkbook',
     // Bump this by 1 for every upload to Play. eas.json uses
     // `appVersionSource: "local"` on purpose, so the number the app reports at
     // runtime is exactly the number in this file — the admin console's

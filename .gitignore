@@ -48,3 +48,7 @@ google-services*.json
 *.jks
 .env
 .env.local
+
+# Firestore emulator
+firestore-debug.log
+firebase-debug.log

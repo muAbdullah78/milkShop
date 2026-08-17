@@ -1,4 +1,4 @@
-# MilkBook · دودھ کھاتہ
+# MilkBook — Doodh Dahi Khata · دودھ دہی کھاتہ
 
 A complete shop-management app for Pakistani milk shops (*doodh walas*), built for
 Android and Google Play.
@@ -170,6 +170,81 @@ agrees, and a windowed view still adds up. It runs clean across randomized shops
 
 ---
 
+## The subscription
+
+Rs 850/month, Rs 2,250/quarter, Rs 8,500/year, after a 7-day free trial. Two payment
+rails run side by side because half the target market cannot use the first one:
+
+- **Google Play Billing** — one tap, renews itself. Needs a card or carrier billing on
+  the shopkeeper's Google account.
+- **Paid outside the app** — JazzCash, Easypaisa, bank, cash. The shopkeeper reports the
+  payment, an admin checks the money arrived and activates them. Zero fee, and it never
+  touches Play's payments policy because no transaction happens inside the app.
+
+### Access is decided by two dates, and nothing else
+
+```
+now <= activeUntil                  → full access
+activeUntil < now <= readOnlyUntil  → read-only, plus export
+now > readOnlyUntil                 → locked, but export still works
+```
+
+Both dates live on the shop document. Both are written **only** by an admin or the
+billing server — a shop member's own update is rejected if it so much as mentions them.
+The comparison happens inside `firestore.rules` against `request.time`, which is Google's
+clock, not the phone's.
+
+The consequence worth stating plainly: **a rooted phone running a patched APK with its
+system clock set to 2019 still cannot write a single delivery.** The app's paywall
+component is a courtesy — it exists so the shopkeeper gets a clear explanation instead of
+every button silently failing. Delete it and the paywall still holds.
+
+Two deliberate exceptions:
+
+**Writes get two days of slack past expiry.** A shopkeeper who does the morning round
+offline on the day their subscription lapses would otherwise have the entire round
+silently rejected on sync. The app stops accepting new work at `activeUntil`; the rules
+allow the queue to drain.
+
+**Reads are never gated.** The export has to read the data to write the file, and
+promising someone their khaata back while cryptographically denying it would be a lie.
+Writes are what create value; writes are what we gate.
+
+### One trial per account, for ever
+
+Creating a shop first writes `trialClaims/{uid}`, which is create-once and immutable —
+the user cannot delete it, and neither can the app. The shop-create rule then refuses a
+trial unless a claim exists naming that exact shop. Delete the shop and start again and
+the claim is still sitting there. No server, no device fingerprinting, no heuristics.
+
+### Discounts
+
+Percent off, rupees off, a fixed price, or extra free days — each scoped to the first
+payment, the first N payments, or every payment for life. Optionally limited to certain
+plans, with an end date, a maximum number of uses, and once-per-shop enforcement.
+
+Codes are readable one at a time by exact name but **not listable** except by an admin, so
+guessing `LAUNCH50` works and enumerating every code you have does not. Redemption counters
+are admin-written, so they cannot be inflated from a phone.
+
+### Verified, not asserted
+
+```bash
+npm test
+```
+
+- **74 security-rules assertions** against the Firestore emulator, every one either an
+  attack that must fail or a right that must work: an expired shop trying to add a
+  customer, a shopkeeper pushing their own expiry date into the future, a second trial, a
+  support admin trying to change what a customer owes, a staff admin promoting themselves.
+- **4,938 subscription-arithmetic assertions** across six simulated shop lifetimes —
+  years of trials, lapses, early renewals and discounts, asserting after every step that a
+  paid day is never lost, that renewing early stacks instead of resetting, that a discount
+  can never produce a negative price, and that 31 January plus one month is 28 February.
+- **536 ledger assertions** for the khaata arithmetic.
+
+---
+
 ## Three pieces, one project
 
 | | Where | What it is |
@@ -232,7 +307,11 @@ silently does nothing is worse than no toggle.
 
 See **[SETUP.md](./SETUP.md)** — Firebase project, security rules, EAS build.
 
-For publishing, **[PLAYSTORE.md](./PLAYSTORE.md)** is the complete route: every manual
+**[LAUNCH.md](./LAUNCH.md)** is the runbook: Firebase, hosting, admin access, signing
+keys, the exact test checklist, Play Console, running the pilot, and the 14-day closed
+test — with the manual steps written out for someone who has done none of them yet.
+
+**[PLAYSTORE.md](./PLAYSTORE.md)** covers the store listing in more depth: every manual
 step before you open Play Console, then Play Console click by click, including the
 Data safety answers, the content rating answers, and the signing-key mistake that
 breaks Google Sign-In for every real user while working perfectly on your own phone.

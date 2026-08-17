@@ -1,18 +1,45 @@
 rules_version = '2';
 
 // MilkBook security model
-// ----------------------
+// ======================
+//
 // Everything a shop owns lives under shops/{shopId}. A signed-in user may only
 // touch a shop whose memberUids contains their uid, so two shops installed from
 // the same Play listing can never see each other's khaata.
 //
 // A super admin is an entry in admins/{uid}. Admins can read across shops for
-// support, and can flip a shop's `suspended` flag, but the rules deliberately
-// stop them rewriting a shop's khaata — support should never be able to
-// silently change what a customer owes.
+// support, and can moderate a shop or change its billing, but the rules
+// deliberately stop them rewriting a shop's khaata — support should never be
+// able to silently change what a customer owes.
+//
+// ── Subscription enforcement ─────────────────────────────────────────────
+//
+// This is the real paywall. Not the app — the app is a suggestion. A rooted
+// phone running a patched APK with its clock set to 2019 still cannot write a
+// single delivery here, because the comparison below uses `request.time`,
+// which is the *server's* clock, and the fields it reads can only be written
+// by an admin.
+//
+// Three properties make it hold:
+//
+//   1. `activeUntil` lives on the shop document, which the rules already read
+//      to check membership — so gating every write costs no extra reads.
+//   2. A shop member's update to their own shop is rejected if it touches any
+//      billing key. Only an admin (or the billing server, running as an admin
+//      service account) can move that date.
+//   3. A shop cannot be created without a bounded trial, and a second trial on
+//      the same account is refused by an immutable claim document.
+//
+// What is deliberately NOT enforced here: reading your own data. Reads stay
+// open to members forever, even long after expiry. The app shows a lock
+// screen, but the export button behind it has to be able to read, and
+// promising someone their data back while cryptographically denying it would
+// be a lie. Writes are what create value; writes are what we gate.
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // ── Identity ───────────────────────────────────────────────────────────
 
     function signedIn() {
       return request.auth != null;
@@ -30,21 +57,113 @@ service cloud.firestore {
       return isAdmin() && adminData().role == 'owner';
     }
 
-    function shopMembers(shopId) {
-      return get(/databases/$(database)/documents/shops/$(shopId)).data.memberUids;
+    function shopData(shopId) {
+      return get(/databases/$(database)/documents/shops/$(shopId)).data;
     }
 
     function isMemberOf(shopId) {
-      return signedIn() && request.auth.uid in shopMembers(shopId);
+      return signedIn() && request.auth.uid in shopData(shopId).memberUids;
     }
 
-    // Only these fields may be touched by an admin on a shop document.
-    function onlyModeratesShop() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly(['suspended', 'suspensionReason', 'suspendedAt', 'adminNote', 'plan', 'updatedAt']);
+    // ── Subscription gate ──────────────────────────────────────────────────
+
+    function nowMs() {
+      return request.time.toMillis();
+    }
+
+    function days(n) {
+      return n * 24 * 60 * 60 * 1000;
+    }
+
+    // Writes queued while the phone was offline replay against the server
+    // clock whenever signal returns. Without slack, a shopkeeper who does the
+    // morning round offline on the day their subscription lapses would have
+    // the whole round silently rejected on sync. Two days covers that; the app
+    // itself stops accepting new work the moment `activeUntil` passes, so this
+    // is not two free days of use — it is a safety net for work already done.
+    function writeGrace() {
+      return days(2);
+    }
+
+    // Note the `.get(key, default)` calls throughout. Reading a key that is
+    // absent from a document raises an error in Firestore rules rather than
+    // returning null, and an erroring rule denies. Written as `d.activeUntil`
+    // this function would have hard-locked every shop created before
+    // subscriptions existed.
+    function canWriteShopData(shopId) {
+      let d = shopData(shopId);
+      let activeUntil = d.get('activeUntil', -1);
+      return d.get('subStatus', '') == 'comp'
+        // Shops created before subscriptions existed carry no billing fields
+        // and are never gated. New shops cannot be created without them (see
+        // the create rule below), so this is not a way in.
+        || activeUntil == -1
+        || (activeUntil is number && activeUntil + writeGrace() > nowMs());
+    }
+
+    // Everything that decides whether a shop has paid. A member may never
+    // touch any of it.
+    function billingKeys() {
+      return [
+        'subStatus', 'subPlan', 'subSource', 'activeUntil', 'readOnlyUntil',
+        'trialUsed', 'trialStartedAt', 'playPurchaseToken', 'playOrderId'
+      ];
+    }
+
+    // Fields an admin may change on someone else's shop. Note this is billing
+    // and moderation only — never the shop's own data.
+    function adminShopKeys() {
+      return billingKeys().concat([
+        'suspended', 'suspensionReason', 'suspendedAt', 'adminNote', 'plan',
+        'cancelAtPeriodEnd', 'updatedAt'
+      ]);
+    }
+
+    function memberTouchesBilling() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny(billingKeys());
+    }
+
+    function adminOnlyModerates() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(adminShopKeys());
+    }
+
+    // A brand-new shop must arrive either with a bounded trial it is entitled
+    // to, or with no access at all pending payment. It may not invent its own
+    // expiry date.
+    function validNewShopBilling(shopId) {
+      let d = request.resource.data;
+      let claim = /databases/$(database)/documents/trialClaims/$(request.auth.uid);
+      let source = d.get('subSource', '');
+      let activeUntil = d.get('activeUntil', -1);
+      let readOnlyUntil = d.get('readOnlyUntil', -1);
+      return (
+        // (a) A genuine first trial.
+        source == 'trial'
+        && d.get('subStatus', '') == 'trialing'
+        && d.get('trialUsed', false) == true
+        && activeUntil is number
+        && readOnlyUntil is number
+        && activeUntil > nowMs()
+        // 8 days, not 7 — the client stamps this from its own clock, and a
+        // phone running slightly fast must not be refused its trial.
+        && activeUntil <= nowMs() + days(8)
+        && readOnlyUntil <= activeUntil + days(8)
+        // The claim is created first, is immutable, and names this shop. A
+        // second shop on the same account finds a claim pointing elsewhere.
+        && exists(claim)
+        && get(claim).data.get('shopId', '') == shopId
+      ) || (
+        // (b) No trial available — the shop is created locked, pending an
+        // admin activating it. Refusing to create a shop at all would be a
+        // worse outcome than creating a locked one.
+        source == 'none'
+        && activeUntil == 0
+        && readOnlyUntil == 0
+      );
     }
 
     // ── Platform config: read by every install, written by owner admins ─────
+    // Also carries the live plan prices, so a price change needs no app update.
     match /platform/{docId} {
       allow read: if true;
       allow write: if isOwnerAdmin();
@@ -64,6 +183,72 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── One free trial per account, ever ───────────────────────────────────
+    // Immutable by design. The user writes it once, naming the shop they are
+    // about to create, and can never remove it. Deleting the shop and starting
+    // again does not hand out a second trial.
+    match /trialClaims/{uid} {
+      allow get: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['shopId', 'claimedAt'])
+        && request.resource.data.shopId is string
+        && request.resource.data.shopId.size() > 0;
+      // Only an owner admin can clear a claim, and only deliberately — for a
+      // genuine support case such as a shop recreated after a device loss.
+      allow update, delete: if isOwnerAdmin();
+    }
+
+    // ── The full billing record ────────────────────────────────────────────
+    // The shop can read its own history — invoices, what was paid, when — but
+    // writes come only from an admin or the billing server. This is the paper
+    // trail; the gate itself is the denormalised pair on the shop document.
+    match /subscriptions/{shopId} {
+      allow read: if isMemberOf(shopId) || isAdmin();
+      allow write: if isAdmin();
+
+      match /payments/{paymentId} {
+        allow read: if isMemberOf(shopId) || isAdmin();
+        allow create, update: if isAdmin();
+        // Never quietly erase a receipt. Corrections are new entries.
+        allow delete: if false;
+      }
+    }
+
+    // ── "I paid, please switch me on" ──────────────────────────────────────
+    // How a shopkeeper who paid by JazzCash, Easypaisa, bank or cash tells you
+    // about it. Creating one grants nothing at all — an admin still has to
+    // check the money arrived and activate. It is an inbox, not a door.
+    match /paymentClaims/{claimId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.amount is number
+        && request.resource.data.amount >= 0
+        && request.resource.data.amount <= 1000000;
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Discount codes ─────────────────────────────────────────────────────
+    // `get` is open to any signed-in user because validating a typed code
+    // means reading that one document. `list` is admin-only so nobody can
+    // enumerate the collection and help themselves to the best code.
+    match /discounts/{code} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // A redemption records that a code was used. It grants nothing on its own
+    // — only an admin moving `activeUntil` does — so a member may create one.
+    match /discountRedemptions/{redemptionId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
     // ── Support inbox: anyone signed in may open a ticket about their shop ──
     match /supportTickets/{ticketId} {
       allow read: if isAdmin()
@@ -74,7 +259,6 @@ service cloud.firestore {
     }
 
     // ── Account-deletion requests raised from the website ───────────────────
-    // Written by the public web form; only admins can read or resolve them.
     match /deletionRequests/{requestId} {
       allow create: if request.resource.data.keys().hasOnly(['email', 'note', 'createdAt', 'status'])
         && request.resource.data.status == 'open'
@@ -103,25 +287,33 @@ service cloud.firestore {
     match /shops/{shopId} {
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid
-        && request.auth.uid in request.resource.data.memberUids;
+        && request.auth.uid in request.resource.data.memberUids
+        && validNewShopBilling(shopId);
 
+      // Reads stay open to members for good — see the note at the top.
       allow read: if isMemberOf(shopId) || isAdmin();
 
-      // Members may edit their own shop. Admins may only moderate it.
       allow update: if (
+          // A member editing their own shop, as long as they keep themselves a
+          // member and do not reach for the billing fields.
           signedIn()
           && request.auth.uid in resource.data.memberUids
           && request.auth.uid in request.resource.data.memberUids
-        ) || (isAdmin() && onlyModeratesShop());
+          && !memberTouchesBilling()
+        ) || (
+          // An admin moderating or billing. Never the shop's own data.
+          isAdmin() && adminOnlyModerates()
+        );
 
       allow delete: if (signedIn() && resource.data.ownerUid == request.auth.uid) || isOwnerAdmin();
 
       // customers, deliveries, sales, payments, khaataEntries, …
       match /{document=**} {
-        // Shop members read and write. Admins may read for support but never
-        // write — a support login must not be able to alter a khaata.
+        // Members read for ever. Admins read for support but never write — a
+        // support login must not be able to alter a khaata.
         allow read: if isMemberOf(shopId) || isAdmin();
-        allow write: if isMemberOf(shopId);
+        // And here is the paywall.
+        allow write: if isMemberOf(shopId) && canWriteShopData(shopId);
       }
     }
   }
