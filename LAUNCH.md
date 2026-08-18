@@ -253,13 +253,19 @@ Fill `.env` with the six values from step 1.4:
 VITE_FIREBASE_API_KEY=AIza...
 VITE_FIREBASE_AUTH_DOMAIN=milkbook-4a2f1.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=milkbook-4a2f1
-VITE_FIREBASE_STORAGE_BUCKET=milkbook-4a2f1.appspot.com
+VITE_FIREBASE_STORAGE_BUCKET=milkbook-4a2f1.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
 VITE_FIREBASE_APP_ID=1:123456789:web:abc123
 ```
 
 > These are public identifiers, not secrets. They identify the project; they grant nothing.
 > The Firestore rules are what protect the data.
+>
+> **Copy them with the copy button, do not retype them.** A single wrong character in the
+> API key or app ID fails with an error that never mentions the key.
+>
+> Note the storage bucket domain: newer projects show `.firebasestorage.app`, older ones
+> `.appspot.com`. Use whichever your console shows.
 
 ## 2.2 Set your real URL
 
