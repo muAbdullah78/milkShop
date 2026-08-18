@@ -21,6 +21,22 @@ criticism of your plan that I think will cost you money if you ignore it.
 | [Part 9 — Play Billing](#part-9--turning-on-google-play-billing) | The automatic card charging you want. |
 | [Part 10 — going public](#part-10--going-public) | Production, and why nobody loses anything. |
 
+> ### On Windows? Read this first.
+>
+> Every command below works in PowerShell **except** where a line chains commands with
+> `&&`. Windows PowerShell 5.1 — the default on Windows — does not understand `&&` and
+> fails with *"The token '&&' is not a valid statement separator"*. Every such chain in
+> this guide has been split into one command per line for exactly that reason, so run
+> them one at a time.
+>
+> Two other small differences:
+>
+> - `ls a b c` needs commas in PowerShell: `ls a, b, c`
+> - `sudo` does not exist. If a global `npm install -g` is refused, close the terminal and
+>   reopen it as Administrator.
+>
+> Everything else — `cd`, `cp`, `npm`, `firebase`, `eas`, `git` — behaves the same.
+
 ---
 
 # Part 0 — before you touch anything
@@ -218,6 +234,15 @@ npm run test:rules
 
 Expected: `✓ security rules clean — 74 assertions, every one an attack or a right`
 
+> **This one needs Java.** The Firestore emulator runs on the JVM. Check with
+> `java -version` — if it is missing, install Temurin JDK 21 from
+> <https://adoptium.net> (Windows: run the `.msi`, tick "Set JAVA_HOME"), close the
+> terminal, reopen it, and try again.
+>
+> If you would rather not install Java, you can skip this step — the rules are already
+> deployed and working. But running it is how you *know* the paywall holds rather than
+> hoping, and it takes one minute.
+
 This runs against a local emulator, so it costs nothing and touches no real data. It
 proves, among other things, that an expired shop cannot add a customer, that a shopkeeper
 cannot push their own expiry date into the future, that a second free trial is refused,
@@ -290,7 +315,10 @@ supportEmail: 'your-real-email@gmail.com',
 ## 2.3 Deploy
 
 ```bash
-cd web && npm install && npm run build && cd ..
+cd web
+npm install
+npm run build
+cd ..
 firebase deploy --only hosting
 ```
 
@@ -984,7 +1012,10 @@ They do not need to be told anything. They do not need to reinstall. They will n
 eas build -p android --profile production
 # 3. Play Console → Production → Create new release → upload → roll out
 # 4. website changes:
-cd web && npm run build && cd .. && firebase deploy --only hosting
+cd web
+npm run build
+cd ..
+firebase deploy --only hosting
 # 5. before every push, run the tests:
 npm test
 ```
@@ -1008,7 +1039,7 @@ npm run build:preview     # test APK
 npm run build:play        # Play bundle
 firebase deploy --only firestore:rules
 firebase deploy --only hosting
-cd web && npm run build   # website + admin console
+cd web; npm run build     # website + admin console (then `cd ..`)
 ```
 
 ## Where things live
