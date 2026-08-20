@@ -30,6 +30,7 @@ import {
   addDoc,
   getDocs,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -248,15 +249,17 @@ async function main() {
 
   const TRIALER = 'uid_trialer';
   const trialer = env.authenticatedContext(TRIALER).firestore();
-  const soon = () => Date.now() + 7 * DAY;
+  // One deadline, stamped on the claim and reused by every shop write below —
+  // which is exactly how the app now behaves.
+  const trialerEnds = Date.now() + 7 * DAY;
 
-  function newShopFor(uid, overrides = {}) {
+  function newShopFor(uid, overrides = {}, endsAt = trialerEnds) {
     return {
       name: 'Fresh Dairy', ownerUid: uid, memberUids: [uid],
       defaultMilkRate: 200, defaultMilkQty: 2, currency: 'PKR',
       createdAt: Date.now(), updatedAt: Date.now(),
       subStatus: 'trialing', subPlan: null, subSource: 'trial',
-      activeUntil: soon(), readOnlyUntil: soon() + 7 * DAY,
+      activeUntil: endsAt, readOnlyUntil: endsAt + 7 * DAY,
       trialUsed: true, trialStartedAt: Date.now(),
       ...overrides,
     };
@@ -267,7 +270,7 @@ async function main() {
 
   await check('CAN claim a trial once', () =>
     assertSucceeds(setDoc(doc(trialer, 'trialClaims', TRIALER), {
-      shopId: 'fresh1', claimedAt: Date.now(),
+      shopId: 'fresh1', claimedAt: Date.now(), trialEndsAt: trialerEnds,
     })));
 
   await check('CAN create the shop the claim names', () =>
@@ -275,7 +278,7 @@ async function main() {
 
   await check('cannot overwrite the claim to point at a second shop', () =>
     assertFails(setDoc(doc(trialer, 'trialClaims', TRIALER), {
-      shopId: 'fresh2', claimedAt: Date.now(),
+      shopId: 'fresh2', claimedAt: Date.now(), trialEndsAt: trialerEnds,
     })));
 
   await check('cannot delete the claim to start over', () =>
@@ -465,6 +468,128 @@ async function main() {
     assertSucceeds(setDoc(doc(staff, 'subscriptions', SHOP, 'payments', 'pay2'), {
       amount: 2250, method: 'jazzcash', at: Date.now(),
     })));
+
+  console.log('\n\n── Onboarding, the real path ' + '─'.repeat(42));
+
+  // These cases pin down the constraint that broke sign-up on a real device:
+  // a batch cannot create a shop and its subcollections at once, because the
+  // subcollection rule reads the parent shop and a `get()` inside rules sees
+  // the database as it was *before* the batch. `shopRepo.create` commits the
+  // shop first for exactly this reason, and these tests keep it that way.
+  const ONB = 'uid_onboarder';
+  const onb = env.authenticatedContext(ONB).firestore();
+  const NEWSHOP = 'shop_onboard';
+
+  function freshShop(uid, trialEndsAt) {
+    return {
+      name: 'Bismillah Milk Shop', ownerUid: uid, memberUids: [uid],
+      defaultMilkRate: 200, defaultMilkQty: 2, currency: 'PKR',
+      createdAt: Date.now(), updatedAt: Date.now(), seedVersion: 1,
+      subStatus: 'trialing', subPlan: null, subSource: 'trial',
+      activeUntil: trialEndsAt, readOnlyUntil: trialEndsAt + 7 * DAY,
+      trialUsed: true, trialStartedAt: Date.now(), cancelAtPeriodEnd: false,
+    };
+  }
+
+  const onbEnds = Date.now() + 7 * DAY;
+
+  await check('claim the trial, stamping the deadline', () =>
+    assertSucceeds(setDoc(doc(onb, 'trialClaims', ONB), {
+      shopId: NEWSHOP, claimedAt: Date.now(), trialEndsAt: onbEnds,
+    })));
+
+  await check('a claim cannot stamp a 10-year deadline', async () => {
+    const greedy = 'uid_greedy_claim';
+    const g = env.authenticatedContext(greedy).firestore();
+    return assertFails(setDoc(doc(g, 'trialClaims', greedy), {
+      shopId: 'x', claimedAt: Date.now(), trialEndsAt: Date.now() + 3650 * DAY,
+    }));
+  });
+
+  await check('ONE batch (shop + seed together) is REFUSED — this was the bug', async () => {
+    const b = writeBatch(onb);
+    b.set(doc(onb, 'shops', NEWSHOP), freshShop(ONB, onbEnds));
+    b.set(doc(onb, 'users', ONB), { shopId: NEWSHOP, createdAt: Date.now() });
+    b.set(doc(onb, 'shops', NEWSHOP, 'categories', 'cat1'), { name: 'Milk', sortOrder: 0 });
+    b.set(doc(onb, 'shops', NEWSHOP, 'products', 'p1'), { name: 'Milk', salePrice: 200 });
+    return assertFails(b.commit());
+  });
+
+  await check('shop + user document together IS allowed', async () => {
+    const b = writeBatch(onb);
+    b.set(doc(onb, 'shops', NEWSHOP), freshShop(ONB, onbEnds));
+    b.set(doc(onb, 'users', ONB), { shopId: NEWSHOP, createdAt: Date.now() });
+    return assertSucceeds(b.commit());
+  });
+
+  await check('...THEN the seed catalogue in its own batch', async () => {
+    const b = writeBatch(onb);
+    b.set(doc(onb, 'shops', NEWSHOP, 'categories', 'cat1'), { name: 'Milk', sortOrder: 0 });
+    b.set(doc(onb, 'shops', NEWSHOP, 'products', 'p1'), { name: 'Milk', salePrice: 200 });
+    b.set(doc(onb, 'shops', NEWSHOP, 'expenseCategories', 'e1'), { name: 'Feed' });
+    return assertSucceeds(b.commit());
+  });
+
+  await check('the trial the shop got matches the claim exactly', async () => {
+    const snap = await getDoc(doc(onb, 'shops', NEWSHOP));
+    if (snap.data().activeUntil !== onbEnds) throw new Error('deadline drifted from the claim');
+    return assertSucceeds(Promise.resolve());
+  });
+
+  console.log('\n\n── Retrying a failed sign-up ' + '─'.repeat(41));
+
+  // The second bug the device test exposed: the first attempt writes a claim,
+  // so a retry must reuse that claim's shop id and deadline. A retry that
+  // invented a new id would find the claim pointing elsewhere and lose the
+  // trial.
+  const RETRY = 'uid_retry';
+  const retry = env.authenticatedContext(RETRY).firestore();
+  const retryShop = 'shop_retry';
+  const retryEnds = Date.now() + 7 * DAY;
+
+  await check('first attempt claims, then "fails" before the shop lands', () =>
+    assertSucceeds(setDoc(doc(retry, 'trialClaims', RETRY), {
+      shopId: retryShop, claimedAt: Date.now(), trialEndsAt: retryEnds,
+    })));
+
+  await check('retry reusing the claim\'s shop id and deadline SUCCEEDS', () =>
+    assertSucceeds(setDoc(doc(retry, 'shops', retryShop), freshShop(RETRY, retryEnds))));
+
+  await check('a retry that invents a new shop id is refused', () =>
+    assertFails(setDoc(doc(retry, 'shops', 'some_other_id'), freshShop(RETRY, retryEnds))));
+
+  await check('a retry cannot help itself to a fresh 7 days', () =>
+    assertFails(setDoc(doc(retry, 'shops', 'shop_retry_greedy'), freshShop(RETRY, Date.now() + 7 * DAY + 60000))));
+
+  console.log('\n\n── Delete the shop and come back later ' + '─'.repeat(31));
+
+  // An expired claim means the deadline has passed. The shop can still be
+  // created — refusing outright would strand them — but it arrives locked for
+  // an admin to activate, not with a fresh trial.
+  const LATE = 'uid_late_returner';
+  const late = env.authenticatedContext(LATE).firestore();
+
+  await seed(async (db) => {
+    await setDoc(doc(db, 'trialClaims', LATE), {
+      shopId: 'shop_late', claimedAt: Date.now() - 60 * DAY,
+      trialEndsAt: Date.now() - 53 * DAY,
+    });
+  });
+
+  await check('cannot claim a fresh trial on an expired claim', () =>
+    assertFails(setDoc(doc(late, 'shops', 'shop_late'), freshShop(LATE, Date.now() + 7 * DAY))));
+
+  await check('CAN create the shop locked, for an admin to activate', () =>
+    assertSucceeds(setDoc(doc(late, 'shops', 'shop_late'), {
+      name: 'Late Dairy', ownerUid: LATE, memberUids: [LATE],
+      defaultMilkRate: 200, defaultMilkQty: 2, currency: 'PKR',
+      createdAt: Date.now(), updatedAt: Date.now(),
+      subStatus: 'none', subPlan: null, subSource: 'none',
+      activeUntil: 0, readOnlyUntil: 0, trialUsed: true, cancelAtPeriodEnd: false,
+    })));
+
+  await check('...and that locked shop cannot write a thing', () =>
+    assertFails(setDoc(doc(late, 'shops', 'shop_late', 'customers', 'c1'), { name: 'X' })));
 
   // ── report ──────────────────────────────────────────────────────────────
 

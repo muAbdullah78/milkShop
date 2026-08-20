@@ -466,24 +466,33 @@ When it asks whether to generate an Android keystore, say **yes**.
 
 The build takes 15–25 minutes and produces an **`.aab`**. Download it.
 
-## 4.3 Get your SHA-1 fingerprints into Firebase
+## 4.3 Get your SHA-1 fingerprint into Firebase
 
 Google will not accept a Google sign-in from an app signed by a certificate it does not
-know. There are **three** certificates, and you need all three in Firebase.
+know. Up to **three** certificates can be in play, and you need each one you actually use
+in Firebase.
 
 ```bash
 eas credentials
-# → Android → Keystore: view
-# Copy the SHA-1 for both development and production
+# → Android → pick a build profile → Keystore: Manage everything needed to build your project
 ```
 
-Firebase Console → Project settings → Your apps → the Android app → **Add fingerprint**.
-Add both. Then **download `google-services.json` again** and replace your local copy.
+Newer `eas-cli` prints the fingerprints immediately on that screen — there is no separate
+"view" step to hunt for. Copy the line that starts `SHA1 Fingerprint`.
 
-**The third one only exists after your first Play upload.** Part 6.6 comes back for it.
-It is the most commonly missed step in Android development and the symptom is brutal:
-sign-in works perfectly on your phone and fails for every single person who installs from
-Play.
+Run it once for the `development` profile and once for `production`. **Most projects use
+the same shared keystore for both** (same `Build Credentials` id, identical fingerprint
+both times) — in that case you only have one fingerprint to add, not two. Only add a
+second one if the two profiles genuinely show different keystores.
+
+Firebase Console → Project settings → Your apps → the Android app → **Add fingerprint**.
+Add whatever you found. Then **download `google-services.json` again** and replace your
+local copy.
+
+**A third fingerprint only exists after your first Play upload** — the Play App Signing
+one. Part 6.6 comes back for it specifically. Missing that one is the most commonly missed
+step in Android development and the symptom is brutal: sign-in works perfectly on your own
+test build and fails for every single person who installs from Play.
 
 ## 4.4 Build a test APK for your own phone
 

@@ -15,7 +15,12 @@ import {
 
 import { db } from '@/lib/firebase';
 import { dayKey, monthKeyOf } from '@/lib/dates';
-import { startTrial, type ShopBilling } from '@/features/subscription';
+import {
+  NO_TRIAL_BILLING,
+  startTrial,
+  trialFromClaim,
+  type ShopBilling,
+} from '@/features/subscription';
 import type {
   Category,
   Customer,
@@ -119,37 +124,51 @@ export const shopRepo = {
     },
     t: T
   ): Promise<string> {
-    const shopId = doc(shopsCol()).id;
     const ts = now();
 
     /*
-     * Claim the free trial before creating the shop.
+     * ── Step 1: the trial claim ──────────────────────────────────────────
      *
-     * This has to be its own write, committed first, and not part of the batch
-     * below: the security rule for creating a shop calls `get()` on the claim,
-     * and a `get()` inside rules sees the database as it was *before* the
-     * batch, so a claim written in the same batch would not exist yet.
+     * Committed on its own, before the shop exists, for two reasons.
      *
-     * The claim is immutable once written and names this exact shop, which is
-     * what stops someone deleting their shop and helping themselves to a
-     * second seven days. If a claim already exists — a returning user, or a
-     * second shop on one account — the write is refused and the shop is
-     * created locked instead, for an admin to activate.
+     * The rule for creating a shop calls `get()` on this claim, and a `get()`
+     * inside security rules sees the database as it was *before* the current
+     * batch — so a claim written in the same batch would not exist yet.
+     *
+     * And if a claim is already here, this is a **retry**. Reuse its shop id
+     * and its recorded end date rather than generating a fresh id: the first
+     * attempt may have failed halfway, and a retry that invented a new id
+     * would find the claim pointing somewhere else and be refused the trial
+     * entirely. Reusing the recorded end date is also what stops "delete the
+     * shop, sign up again" from being an unlimited trial — the second attempt
+     * inherits the original deadline, not a new seven days.
      */
+    let shopId: string;
     let billing: ShopBilling;
-    try {
-      await setDoc(trialClaimDoc(uid), { shopId, claimedAt: ts });
-      billing = startTrial(ts);
-    } catch {
-      billing = {
-        subStatus: 'none',
-        subPlan: null,
-        subSource: 'none',
-        activeUntil: 0,
-        readOnlyUntil: 0,
-        trialUsed: true,
-        cancelAtPeriodEnd: false,
-      };
+
+    const priorClaim = await getDoc(trialClaimDoc(uid)).catch(() => null);
+    const claimed = priorClaim?.exists()
+      ? (priorClaim.data() as { shopId?: string; claimedAt?: number; trialEndsAt?: number })
+      : null;
+
+    if (claimed?.shopId) {
+      shopId = claimed.shopId;
+      const endsAt = claimed.trialEndsAt ?? 0;
+      billing =
+        endsAt > ts ? trialFromClaim(endsAt, claimed.claimedAt ?? ts) : NO_TRIAL_BILLING;
+    } else {
+      shopId = doc(shopsCol()).id;
+      const fresh = startTrial(ts);
+      try {
+        await setDoc(trialClaimDoc(uid), {
+          shopId,
+          claimedAt: ts,
+          trialEndsAt: fresh.activeUntil,
+        });
+        billing = fresh;
+      } catch {
+        billing = NO_TRIAL_BILLING;
+      }
     }
 
     const shop: Omit<Shop, 'id'> = {
@@ -168,9 +187,18 @@ export const shopRepo = {
       ...billing,
     };
 
-    const batch = writeBatch(db());
-    batch.set(shopDoc(shopId), clean(shop));
-    batch.set(
+    /*
+     * ── Step 2: the shop itself ──────────────────────────────────────────
+     *
+     * Must be committed before anything under `shops/{shopId}/…` is written.
+     * The subcollection rule checks membership by reading the parent shop, and
+     * a batch that created both at once would evaluate that read against a
+     * shop that does not exist yet — denying every seed write and rejecting
+     * the whole batch. That failure is what "Could not save" looked like.
+     */
+    const shopBatch = writeBatch(db());
+    shopBatch.set(shopDoc(shopId), clean(shop));
+    shopBatch.set(
       userDoc(uid),
       clean({
         shopId,
@@ -181,6 +209,17 @@ export const shopRepo = {
       }),
       { merge: true }
     );
+    await shopBatch.commit();
+
+    /*
+     * ── Step 3: the starter catalogue ────────────────────────────────────
+     *
+     * A separate commit, now that the parent shop exists. Failures here are
+     * swallowed on purpose: the shop is already usable and the shopkeeper can
+     * add their own categories, whereas throwing would strand them on the
+     * onboarding screen with a shop that actually exists.
+     */
+    const seedBatch = writeBatch(db());
 
     // Seed catalogue -------------------------------------------------------
     const catIdByKey: Record<string, string> = {};
@@ -195,7 +234,7 @@ export const shopRepo = {
         seedKey: c.seedKey,
         createdAt: ts,
       };
-      batch.set(shopSubDoc(shopId, COL.categories, id), row);
+      seedBatch.set(shopSubDoc(shopId, COL.categories, id), row);
     });
 
     SEED_PRODUCTS.forEach((p) => {
@@ -215,7 +254,7 @@ export const shopRepo = {
         createdAt: ts,
         updatedAt: ts,
       };
-      batch.set(shopSubDoc(shopId, COL.products, id), row);
+      seedBatch.set(shopSubDoc(shopId, COL.products, id), row);
     });
 
     SEED_EXPENSE_CATEGORIES.forEach((c, i) => {
@@ -227,10 +266,10 @@ export const shopRepo = {
         seedKey: c.seedKey,
         sortOrder: i,
       };
-      batch.set(shopSubDoc(shopId, COL.expenseCategories, id), row);
+      seedBatch.set(shopSubDoc(shopId, COL.expenseCategories, id), row);
     });
 
-    await batch.commit();
+    await seedBatch.commit().catch(() => undefined);
     return shopId;
   },
 
