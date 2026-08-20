@@ -37,6 +37,28 @@ criticism of your plan that I think will cost you money if you ignore it.
 >
 > Everything else — `cd`, `cp`, `npm`, `firebase`, `eas`, `git` — behaves the same.
 
+## Before Part 1: install the project's own dependencies
+
+If you just cloned this repo, do this **once**, from the project root, before anything else:
+
+```powershell
+npm install
+```
+
+This is different from `npm install -g firebase-tools` in Part 1.7 or `npm install -g eas-cli`
+in Part 4.1. Those `-g` installs put a *global command* on your machine — the `firebase` and
+`eas` programs themselves. Plain `npm install`, with no `-g` and run from the project root,
+reads `package.json` and downloads everything **this specific project** needs into a
+`node_modules` folder next to it — including the test tooling Part 1.8 uses.
+
+`node_modules` is never committed to GitHub (correctly — it can be gigabytes and is
+regenerated from `package.json`), so a fresh clone has none of it yet. Skip this step and
+`npm run test:rules` fails with `Cannot find package '@firebase/rules-unit-testing'`, because
+the package is *listed* in `package.json` but was never actually downloaded.
+
+The website has its own separate dependencies — Part 2.3 covers that `npm install`, inside
+`web/`, when you get there.
+
 ---
 
 # Part 0 — before you touch anything
