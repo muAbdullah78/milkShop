@@ -274,6 +274,46 @@ export function startTrial(now: number, days = TRIAL_DAYS): Required<Omit<ShopBi
 }
 
 /**
+ * Billing for a shop created without a trial — because the account has already
+ * used its one trial, or the claim write failed. The shop exists and is safe,
+ * but nothing can be written to it until an admin activates it.
+ *
+ * Refusing to create the shop at all would be worse: the shopkeeper would be
+ * stuck on the onboarding screen with no way forward.
+ */
+export const NO_TRIAL_BILLING: ShopBilling = {
+  subStatus: 'none',
+  subPlan: null,
+  subSource: 'none',
+  activeUntil: 0,
+  readOnlyUntil: 0,
+  trialUsed: true,
+  cancelAtPeriodEnd: false,
+};
+
+/**
+ * Rebuilds trial billing from an existing claim.
+ *
+ * Used when onboarding is retried after a failure. The claim already recorded
+ * exactly when this account's trial ends, so the retry reuses that instant
+ * rather than starting a fresh seven days — which is what stops "delete the
+ * shop and sign up again" from being an unlimited trial, while still letting a
+ * genuine retry five minutes later succeed.
+ */
+export function trialFromClaim(trialEndsAt: number, claimedAt: number): ShopBilling {
+  return {
+    subStatus: 'trialing',
+    subPlan: null,
+    subSource: 'trial',
+    activeUntil: trialEndsAt,
+    readOnlyUntil: trialEndsAt + READ_ONLY_DAYS * DAY_MS,
+    trialUsed: true,
+    trialStartedAt: claimedAt,
+    cancelAtPeriodEnd: false,
+  };
+}
+
+/**
  * Where a new period should end.
  *
  * Renewing early must not throw away the days already paid for, so the new

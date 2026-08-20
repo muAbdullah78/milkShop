@@ -144,14 +144,18 @@ service cloud.firestore {
         && activeUntil is number
         && readOnlyUntil is number
         && activeUntil > nowMs()
-        // 8 days, not 7 — the client stamps this from its own clock, and a
-        // phone running slightly fast must not be refused its trial.
-        && activeUntil <= nowMs() + days(8)
         && readOnlyUntil <= activeUntil + days(8)
         // The claim is created first, is immutable, and names this shop. A
         // second shop on the same account finds a claim pointing elsewhere.
         && exists(claim)
         && get(claim).data.get('shopId', '') == shopId
+        // And the trial ends exactly when the claim says it does — not seven
+        // fresh days from whenever this write happens. That is what makes a
+        // retry after a failed first attempt work, while "delete the shop and
+        // sign up again" inherits the original deadline instead of resetting
+        // it. Once that instant has passed, `activeUntil > nowMs()` above can
+        // no longer be satisfied and the shop is created locked.
+        && activeUntil == get(claim).data.get('trialEndsAt', 0)
       ) || (
         // (b) No trial available — the shop is created locked, pending an
         // admin activating it. Refusing to create a shop at all would be a
@@ -192,9 +196,14 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if signedIn()
         && request.auth.uid == uid
-        && request.resource.data.keys().hasOnly(['shopId', 'claimedAt'])
+        && request.resource.data.keys().hasOnly(['shopId', 'claimedAt', 'trialEndsAt'])
         && request.resource.data.shopId is string
-        && request.resource.data.shopId.size() > 0;
+        && request.resource.data.shopId.size() > 0
+        // The deadline is stamped once, here, and bounded. Everything after
+        // this reads it rather than setting its own.
+        && request.resource.data.trialEndsAt is number
+        && request.resource.data.trialEndsAt > nowMs()
+        && request.resource.data.trialEndsAt <= nowMs() + days(8);
       // Only an owner admin can clear a claim, and only deliberately — for a
       // genuine support case such as a shop recreated after a device loss.
       allow update, delete: if isOwnerAdmin();
